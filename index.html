@@ -126,6 +126,8 @@ input::placeholder{color:rgba(159,176,198,.55)}
 .card.hz .tag{top:2px;font-size:8px}
 .card.hz .mk{bottom:4px;width:5px;height:5px;margin-left:-2.5px}
 .row{display:flex;gap:7px;flex-wrap:wrap;align-items:flex-end;min-height:70px;padding-top:10px}
+/* 相手の札：向かいに座る相手から見て左が小さい＝こちらから見て右端が最小。右寄せで並べる */
+.row.rev{flex-direction:row-reverse}
 
 /* ============ ホーム ============ */
 .logo{display:flex;justify-content:center;height:128px;margin:30px 0 6px;position:relative}
@@ -365,9 +367,9 @@ function reduce(s0, uid, a){
       s.piles = {0:deck.slice(0,half), 1:deck.slice(half)}; s.pileCount = 2;
     }else{ s.piles = {0:deck}; s.pileCount = 1; }
     s.match.round++;
+    s.log = [];  // ログはラウンドごと
     if(s.match.points) s.match.roundStart = clone(s.match.points);
     Object.assign(s,{status:'playing',turn:s.match.dealer,phase:'draw',drawn:null,drawnFrom:null,attackId:null,streak:0,last:null,lastAtk:{},lastPlaced:null,winner:null,outOrder:[],seq:0});
-    addLog(s,`── 第${s.match.round}/${s.match.rounds}ラウンド開始（親：${P(s.turn)}）`);
   };
 
   const nextTurn = () => {
@@ -391,7 +393,6 @@ function reduce(s0, uid, a){
     m.ranks = ranks;
     s.status = 'ended';
     const top = s.players.filter((_,i)=>ranks[i]===1).map(p=>p.name).join('・');
-    addLog(s,`対戦終了。優勝：${top}`);
     s._record = {
       endedAt: Date.now(),
       settings: {chips:!!m.points, deck:s.settings.deck, log:s.settings.log||'full', rounds:m.rounds, initPoints: m.points ? INIT_POINTS[n] : null},
@@ -418,12 +419,11 @@ function reduce(s0, uid, a){
     }
     s.match.results.push({winner:w, order, settle, hidden:hid, six});
     s.winner = w; s.phase = null;
-    addLog(s, `${P(w)} がラウンド勝利` + (pts ? `（裏${hid}枚${six?`・6が${six}枚`:''}→ 各プレイヤーから${settle}点）` : ''));
     if(s.match.round >= s.match.rounds) finishMatch(); else s.status = 'roundEnd';
     return true;
   };
 
-  const markOut = i => { if(hiddenCount(s,i)===0 && !s.outOrder.includes(i)){ s.outOrder.push(i); addLog(s,`${P(i)} のカードがすべて公開されました`); } };
+  const markOut = i => { if(hiddenCount(s,i)===0 && !s.outOrder.includes(i)){ s.outOrder.push(i); } };
 
   switch(a.type){
     case 'join': {
@@ -473,7 +473,6 @@ function reduce(s0, uid, a){
       isHost();
       if(s.status!=='playing' && s.status!=='roundEnd') return null;
       s.status='lobby'; s.match=null; s.hands={}; s.piles={}; s.phase=null;
-      addLog(s,'ホストが対戦を中止しました（戦績には記録されません）');
       return s;
     }
     case 'tolobby': {
@@ -490,7 +489,6 @@ function reduce(s0, uid, a){
       const p = s.piles[k];
       if(!p || !p.length) fail('その山にはカードがありません');
       s.drawn = p.pop(); s.drawnFrom = s.pileCount===2 ? k : null; s.phase='attack'; s.streak=0;
-      if(s.pileCount===2) addLog(s,`${P(me)} が${k===0?'左':'右'}の山から引いた（${colorName(s.drawn)}）`);
       return s;
     }
     case 'guess': {
@@ -525,17 +523,18 @@ function reduce(s0, uid, a){
         checkEnd();
         return s;
       }
-      addLog(s,`${P(me)}：${where}を「${num}」→ ハズレ`);
+      let shown;
       if(s.drawn!==null){
         insertCard(s.hands[me],{id:s.drawn,open:true,fresh:s.seq});
         s.lastPlaced = {seat:me, cardId:s.drawn};
-        addLog(s,`${P(me)} は引いたカード（${colorName(s.drawn)}${numOf(s.drawn)}）を公開して加えた`);
+        shown = s.drawn;
         s.drawn=null;
       }else{
         const ac = hand(s,me).find(c=>c.id===s.attackId);
         ac.open=true; ac.fresh=s.seq;
-        addLog(s,`${P(me)} はアタックに使ったカード（${colorName(ac.id)}${numOf(ac.id)}）を公開`);
+        shown = ac.id;
       }
+      addLog(s,`${P(me)}：${where}を「${num}」→ ハズレ（自分の${colorName(shown)}${numOf(shown)}を公開）`);
       markOut(me);
       if(!checkEnd()) nextTurn();
       return s;
@@ -547,8 +546,8 @@ function reduce(s0, uid, a){
         s.seq++;
         insertCard(s.hands[me],{id:s.drawn,open:false,fresh:s.seq});
         s.lastPlaced = {seat:me, cardId:s.drawn};
-        addLog(s,`${P(me)} はストップ。引いたカードを伏せて加えた`);
-      }else addLog(s,`${P(me)} はストップ`);
+      }
+      addLog(s,`${P(me)}：ストップ`);
       nextTurn();
       return s;
     }
@@ -870,20 +869,22 @@ function renderGame(){
   // 各プレイヤーの手札は「その人から見て左が小さい」。自分から見た向きに変換して表示する
   //   上（向かい）：右が小さい／左の席：上が小さい／右の席：下が小さい
   const base = seat>=0 ? seat : 0, rel = k=>(base+k)%n;
-  const layout = n===2 ? [[rel(1),'top']] : n===3 ? [[rel(1),'right'],[rel(2),'left']] : [[rel(1),'right'],[rel(2),'top'],[rel(3),'left']];
+  // 相手は全員、向かい合っている前提で表示（こちらから見て一番右が最小）。手番順に上から並べる
+  const layout = [...Array(n-1)].map((_,k)=>[rel(k+1),'top']);
   if(seat<0) layout.push([base,'bottom']);
   const panel = (i,pos) => {
     const h=hand(s,i), hid=hiddenCount(s,i), isTurn=playing && s.turn===i;
     const side = pos==='left' || pos==='right';
-    const ordered = (pos==='top' || pos==='right') ? h.slice().reverse() : h.slice();
+    const ordered = pos==='right' ? h.slice().reverse() : h.slice();
     const cards = ordered.map(c=>cardHtml(c,{hz:side, face:c.open||showAll, pick:attacking && !c.open, act:'target', seat:i, sel:ui.target===i && ui.cardId===c.id, tag:isNew(i,c)?'新':'', six:c.open&&numOf(c.id)===6})).join('');
     const la = playing && s.lastAtk && s.lastAtk[i];
     const laHtml = la ? `<div class="lastatk">前回：${la.target===seat?'あなた':esc(s.players[la.target].name)}の小さい方から${la.pos}枚目に「${la.num}」→ <span class="${la.ok?'ok':'ng'}">${la.ok?'正解':'ハズレ'}</span></div>` : '';
     const st = !playing ? (s.winner===i?'<span class="now">ラウンド勝利</span>':'') : hid===0 ? '全公開' : isTurn ? '<span class="now">手番</span>' : `伏せ ${hid}枚`;
     const dir = side ? `<span class="dir">${pos==='left'?'↓ 小→大':'↑ 小→大'}</span>` : '';
-    return `<section class="opp ${side?'side '+pos:''} ${isTurn?'turn':''} ${playing&&hid===0?'out':''}"><div class="head"><span><b>${esc(s.players[i].name)}</b>${ptsHtml(i)}</span><span>${st}</span></div><div class="${side?'col':'row'}">${cards}</div>${dir}${laHtml}</section>`;
+    return `<section class="opp ${side?'side '+pos:''} ${isTurn?'turn':''} ${playing&&hid===0?'out':''}"><div class="head"><span><b>${esc(s.players[i].name)}</b>${ptsHtml(i)}</span><span>${st}</span></div><div class="${side?'col':pos==='top'?'row rev':'row'}">${cards}</div>${dir}${laHtml}</section>`;
   };
-  const PN = Object.fromEntries(layout.map(([i,pos])=>[pos,panel(i,pos)]));
+  const oppsHtml = layout.filter(([,pos])=>pos==='top').map(([i,pos])=>panel(i,pos)).join('');
+  const bottomHtml = layout.filter(([,pos])=>pos==='bottom').map(([i,pos])=>panel(i,pos)).join('');
 
   const turnName = esc(s.players[s.turn]?.name||'');
   const drawnHtml = (s.drawn!==null && playing) ? `<div class="drawn">${cardHtml({id:s.drawn,open:false,fresh:0},{face:myTurn})}<span>${s.drawnFrom===0?'左の山から':s.drawnFrom===1?'右の山から':''}引いたカード</span></div>` : '';
@@ -928,8 +929,8 @@ function renderGame(){
     <div class="top"><span>部屋 ${esc(code)}　${roundLabel}${seat<0?'（観戦中）':''}</span>
       <span class="r">${isHost && s.status!=='ended' ? '<button data-act="abort">中止</button>':''}<button data-act="share">招待</button></span></div>
     ${(()=>{ const mid = `<div class="mid">${pilesHtml(s, myTurn && s.phase==='draw')}${drawnHtml}<div class="msg">${lastHtml}<div>${msg}</div></div></div>`;
-      return (PN.left||PN.right) ? `<div class="board">${PN.top?`<div class="b-top">${PN.top}</div>`:''}<div class="b-left">${PN.left||''}</div><div class="b-center">${mid}</div><div class="b-right">${PN.right||''}</div></div>` : `${PN.top||''}${mid}`; })()}
-    ${PN.bottom||''}
+      return `${oppsHtml}${mid}`; })()}
+    ${bottomHtml}
     <div class="actions">${controls}</div>
     ${mine}
     ${log}
