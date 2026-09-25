@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2F3B37">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="アルゴ">
+<title>アルゴ対戦</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --table:#2F3B37; --panel:#3A4843; --deep:#27322E; --line:#4E5E57; --ink:#EDEBE4; --muted:#A2AEA8;
+  --accent:#E3B23C; --hit:#86C98A; --miss:#E0735A; --black:#1B1C1E; --white:#F6F4EE;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--table);color:var(--ink);
+  font-family:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+  -webkit-tap-highlight-color:transparent}
+body{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+#app{max-width:560px;margin:0 auto;padding:12px 14px 28px;display:flex;flex-direction:column;gap:14px}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible,input:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{background:var(--accent);color:var(--black);font-weight:700;border-radius:10px;padding:14px 16px;font-size:16px;width:100%}
+.btn.sub{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.btn:disabled{opacity:.35;cursor:default}
+input{font:inherit;font-size:16px;width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--table);color:var(--ink)}
+label,.lbl{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+p{margin:0;line-height:1.7}
+h3{margin:0;font-size:15px}
+.muted{color:var(--muted);font-size:13px}
+.center{text-align:center}
+
+/* カード */
+.card{width:40px;height:58px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:22px;position:relative;flex:none;transition:transform .15s,box-shadow .15s;user-select:none}
+.card.b{background:var(--black);color:var(--white);box-shadow:inset 0 0 0 1px #000}
+.card.w{background:var(--white);color:var(--black)}
+.card.back.b,.pc.b{background:repeating-linear-gradient(135deg,#1B1C1E 0 5px,#2B2D30 5px 10px)}
+.card.back.w,.pc.w{background:repeating-linear-gradient(135deg,#F6F4EE 0 5px,#DEDAD0 5px 10px)}
+.card.open::after{content:"";position:absolute;left:7px;right:7px;bottom:5px;height:3px;border-radius:2px;background:var(--accent)}
+.card .tag{position:absolute;top:3px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;opacity:.55}
+.card.pick{cursor:pointer}
+.card.sel{transform:translateY(-7px);box-shadow:0 0 0 3px var(--accent)}
+.card.fresh{animation:pop .6s ease-out}
+.lg .card{width:48px;height:70px;font-size:28px;border-radius:7px}
+@keyframes pop{0%{transform:scale(1.25)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.card{transition:none}.card.fresh{animation:none}}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;min-height:66px;padding-top:8px}
+
+/* ホーム */
+.logo{display:flex;gap:10px;justify-content:center;margin:28px 0 6px}
+.logo .card{width:58px;height:84px;font-size:38px;border-radius:8px}
+.logo .card:nth-child(2){transform:translateY(-10px)}
+.logo .card:nth-child(3){transform:translateY(-4px)}
+.lead{text-align:center;color:var(--muted);font-size:14px;margin-bottom:10px}
+.box{background:var(--panel);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.split{display:flex;gap:8px}
+.split input{flex:1}
+.split input.code{letter-spacing:.3em;text-align:center}
+.split .btn{width:auto;white-space:nowrap}
+.who{display:flex;justify-content:space-between;align-items:center}
+.who b{font-size:18px}
+.who button{color:var(--muted);font-size:13px;padding:6px 0}
+.names{display:flex;flex-wrap:wrap;gap:8px}
+.names button{padding:10px 14px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line);font-weight:700}
+.names button.on{background:var(--accent);color:var(--black);box-shadow:none}
+
+/* ロビー */
+.code{display:flex;gap:8px;justify-content:center}
+.code .card{width:52px;height:74px;font-size:34px}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.plist li{display:flex;justify-content:space-between;padding:12px 14px;background:var(--table);border-radius:10px}
+.seg{display:flex;background:var(--table);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;padding:10px 6px;border-radius:8px;font-size:14px;font-weight:700;color:var(--muted)}
+.seg button.on{background:var(--ink);color:var(--black)}
+.seg button:disabled{cursor:default}
+
+/* 対戦 */
+.top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);gap:12px}
+.top .r{display:flex;gap:16px}
+.top button{color:var(--muted);font-size:13px;padding:6px 0}
+.opp{background:var(--panel);border-radius:12px;padding:10px 12px}
+.opp.turn{box-shadow:inset 0 0 0 2px var(--accent)}
+.opp.out{opacity:.6}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.head b{font-size:15px}
+.head span{font-size:12px;color:var(--muted)}
+.head .pts{font-weight:900;color:var(--ink);font-size:14px;margin-left:8px}
+.head .now{color:var(--accent);font-weight:700}
+.mid{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;padding:2px}
+.pile{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:4px;border-radius:10px}
+.pile:disabled{cursor:default}
+.pile.can{box-shadow:inset 0 0 0 2px var(--accent);color:var(--ink)}
+.stackv{position:relative;width:44px;height:70px}
+.pc{position:absolute;left:0;width:40px;height:58px;border-radius:6px;top:0;box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.pc.b{box-shadow:inset 0 0 0 1px #000}
+.pc.under{top:12px;left:4px}
+.pc.top{z-index:1}
+.pc.none{box-shadow:inset 0 0 0 1px var(--line);background:transparent}
+.peek{font-size:11px;color:var(--muted);line-height:1.3;text-align:center}
+.drawn{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:4px}
+.msg{flex-basis:100%;font-size:14px;line-height:1.6}
+.result{font-weight:700}
+.result.ok{color:var(--hit)}
+.result.ng{color:var(--miss)}
+.pad{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.pad button{height:48px;border-radius:8px;font-weight:900;font-size:20px}
+.pad.b button{background:var(--black);color:var(--white)}
+.pad.w button{background:var(--white);color:var(--black)}
+.pad button.on{box-shadow:0 0 0 3px var(--accent);transform:translateY(-2px)}
+.actions{display:flex;flex-direction:column;gap:8px}
+.mine{background:var(--deep);border-radius:12px;padding:10px 12px}
+details{font-size:13px;color:var(--muted)}
+details summary{cursor:pointer;padding:6px 0}
+details ol{margin:6px 0 0;padding-left:1.4em;line-height:1.8;max-height:220px;overflow:auto}
+
+/* 結果シート */
+.overlay{position:fixed;inset:0;background:rgba(20,26,24,.72);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));overflow:auto}
+.sheet{background:var(--panel);border-radius:16px;padding:20px;width:100%;max-width:520px;display:flex;flex-direction:column;gap:12px}
+.sheet h2{margin:0;font-size:24px;font-weight:900}
+.peekbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));width:calc(100% - 28px);max-width:532px}
+
+/* 表 */
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:9px 6px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--muted);font-weight:400}
+th:first-child,td:first-child{text-align:left}
+tr:last-child td{border-bottom:0}
+td.plus{color:var(--hit)} td.minus{color:var(--miss)}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat{background:var(--table);border-radius:10px;padding:12px}
+.stat b{display:block;font-size:24px;font-weight:900;line-height:1.2}
+.stat span{font-size:12px;color:var(--muted)}
+.hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.hist details{background:var(--table);border-radius:10px;padding:8px 12px;color:var(--ink)}
+.hist summary{display:flex;justify-content:space-between;gap:8px;list-style:none}
+.hist summary::-webkit-details-marker{display:none}
+.hist .sub{font-size:12px;color:var(--muted)}
+.hist .me{color:var(--accent);font-weight:700}
+.tags{font-size:12px;color:var(--muted)}
+
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:var(--ink);color:var(--black);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:700;
+  opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;z-index:10}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ============================================================
+   Firebase設定：アルゴ専用プロジェクト（algo-be1c6）
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyBN5LYyViJ1lF7lEM2wWs998toRTCNVO2U",
+  authDomain: "algo-be1c6.firebaseapp.com",
+  projectId: "algo-be1c6",
+  storageBucket: "algo-be1c6.firebasestorage.app",
+  messagingSenderId: "1013992108105",
+  appId: "1:1013992108105:web:51d4ee6c8058162ca28f98"
+};
+const COL = {rooms:'algo_rooms', players:'algo_players', games:'algo_games'};
+
+// ==LOGIC START==
+/* カードID = 数字*2 + (白なら1)。IDで昇順ソートすると
+   「左が小さい・同じ数字なら黒が左」の並びになる */
+const PER = {2:4, 3:3, 4:2};
+const INIT_POINTS = {2:400, 3:230, 4:200};
+const numOf = id => id >> 1;
+const isWhite = id => (id & 1) === 1;
+const colorName = id => isWhite(id) ? '白' : '黒';
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function seatOf(s,uid){ return s.players.findIndex(p=>p.uid===uid); }
+function hand(s,i){ return (s.hands && s.hands[i]) || []; }
+function hiddenCount(s,i){ return hand(s,i).filter(c=>!c.open).length; }
+function aliveSeats(s){ return s.players.map((_,i)=>i).filter(i=>hiddenCount(s,i)>0); }
+function pileArr(s){ return [...Array(s.pileCount||1).keys()].map(i=>(s.piles&&s.piles[i])||[]); }
+function deckCount(s){ return pileArr(s).reduce((a,p)=>a+p.length,0); }
+function addLog(s,t){ s.log.push(t); if(s.log.length>80) s.log.splice(0,s.log.length-80); }
+function insertCard(h,c){ h.push(c); h.sort((a,b)=>a.id-b.id); }
+
+function newRoom(uid,name,settings){
+  settings = settings || {};
+  return {status:'lobby',host:uid,players:[{uid,name}],
+    settings:{chips:!!settings.chips, deck:settings.deck==='local'?'local':'normal'},
+    hands:{},piles:{},pileCount:1,turn:0,phase:null,drawn:null,attackId:null,streak:0,
+    last:null,winner:null,outOrder:[],log:[],seq:0,match:null,matchNo:0,
+    createdAt:Date.now(),updatedAt:Date.now()};
+}
+
+function reduce(s0, uid, a){
+  const s = clone(s0);
+  const me = seatOf(s,uid);
+  const n = s.players.length;
+  const P = i => s.players[i].name;
+  const fail = m => { throw new Error(m); };
+  const isHost = () => { if(uid!==s.host) fail('ホストだけが操作できます'); };
+  const myTurn = () => { if(s.status!=='playing') fail('ゲーム中ではありません'); if(me!==s.turn) fail('あなたの番ではありません'); };
+  const pts = s.match && s.match.points;
+
+  const dealRound = () => {
+    const deck = shuffle([...Array(24).keys()]);
+    s.hands = {};
+    s.players.forEach((_,i)=>{ s.hands[i] = deck.splice(0,PER[n]).sort((x,y)=>x-y).map(id=>({id,open:false,fresh:0})); });
+    if(s.settings.deck==='local'){
+      const half = Math.ceil(deck.length/2);
+      s.piles = {0:deck.slice(0,half), 1:deck.slice(half)}; s.pileCount = 2;
+    }else{ s.piles = {0:deck}; s.pileCount = 1; }
+    s.match.round++;
+    if(s.match.points) s.match.roundStart = clone(s.match.points);
+    Object.assign(s,{status:'playing',turn:s.match.dealer,phase:'draw',drawn:null,attackId:null,streak:0,last:null,winner:null,outOrder:[],seq:0});
+    addLog(s,`── 第${s.match.round}/${s.match.rounds}ラウンド開始（親：${P(s.turn)}）`);
+  };
+
+  const nextTurn = () => {
+    s.drawn=null; s.attackId=null; s.streak=0;
+    let i=s.turn;
+    for(let k=0;k<n;k++){ i=(i+1)%n; if(hiddenCount(s,i)>0) break; }
+    s.turn=i;
+    s.phase = deckCount(s) ? 'draw' : 'attack';
+  };
+
+  const finishMatch = () => {
+    const m = s.match, ranks = {};
+    if(m.points){
+      s.players.forEach((_,i)=>{ ranks[i] = 1 + s.players.filter((_,j)=>m.points[j]>m.points[i]).length; });
+    }else{
+      m.results[m.results.length-1].order.forEach((seat,k)=>{ ranks[seat]=k+1; });
+    }
+    m.ranks = ranks;
+    s.status = 'ended';
+    const top = s.players.filter((_,i)=>ranks[i]===1).map(p=>p.name).join('・');
+    addLog(s,`対戦終了。優勝：${top}`);
+    s._record = {
+      endedAt: Date.now(),
+      settings: {chips:!!m.points, deck:s.settings.deck, initPoints: m.points ? INIT_POINTS[n] : null},
+      pids: s.players.map(p=>p.uid),
+      players: s.players.map((p,i)=>({pid:p.uid, name:p.name, rank:ranks[i],
+        points: m.points ? m.points[i] : null,
+        roundWins: m.results.filter(r=>r.winner===i).length})),
+      rounds: m.results.map(r=>({winner:s.players[r.winner].uid, order:r.order.map(i=>s.players[i].uid)}))
+    };
+  };
+
+  const checkEnd = () => {
+    const al = aliveSeats(s);
+    if(al.length>1) return false;
+    const w = al[0];
+    if(s.drawn!==null){ insertCard(s.hands[s.turn],{id:s.drawn,open:false,fresh:0}); s.drawn=null; }
+    const order = [w, ...s.outOrder.slice().reverse()];
+    let settle = 0, hid = 0, six = 0;
+    if(pts){
+      const h = hand(s,w).filter(c=>!c.open);
+      hid = h.length; six = h.filter(c=>numOf(c.id)===6).length;
+      settle = hid*10 + six*10;
+      s.players.forEach((_,i)=>{ if(i!==w){ pts[i]-=settle; pts[w]+=settle; } });
+    }
+    s.match.results.push({winner:w, order, settle, hidden:hid, six});
+    s.winner = w; s.phase = null;
+    addLog(s, `${P(w)} がラウンド勝利` + (pts ? `（裏${hid}枚${six?`・6が${six}枚`:''}→ 各プレイヤーから${settle}点）` : ''));
+    if(s.match.round >= s.match.rounds) finishMatch(); else s.status = 'roundEnd';
+    return true;
+  };
+
+  const markOut = i => { if(hiddenCount(s,i)===0 && !s.outOrder.includes(i)){ s.outOrder.push(i); addLog(s,`${P(i)} のカードがすべて公開されました`); } };
+
+  switch(a.type){
+    case 'join': {
+      if(me>=0) return null;
+      if(s.status==='playing' || s.status==='roundEnd') fail('対戦中のため参加できません');
+      if(n>=4) fail('満員です（最大4人）');
+      s.players.push({uid,name:String(a.name||'ゲスト').slice(0,12)});
+      return s;
+    }
+    case 'leave': {
+      if(me<0) return null;
+      if(s.status==='playing' || s.status==='roundEnd') fail('対戦中は抜けられません');
+      s.players.splice(me,1);
+      if(s.host===uid && s.players.length) s.host=s.players[0].uid;
+      s.hands={}; s.status='lobby'; s.match=null;
+      return s;
+    }
+    case 'settings': {
+      isHost();
+      if(s.status==='playing' || s.status==='roundEnd') fail('対戦中は変更できません');
+      if(a.chips!==undefined) s.settings.chips = !!a.chips;
+      if(a.deck!==undefined) s.settings.deck = a.deck==='local' ? 'local' : 'normal';
+      return s;
+    }
+    case 'start': {
+      isHost();
+      if(s.status==='playing' || s.status==='roundEnd') fail('すでに対戦中です');
+      if(n<2) fail('2人以上で開始できます');
+      s.matchNo = (s.matchNo||0)+1;
+      s.log = [];
+      s.match = {round:0, rounds: s.settings.chips ? n : 1, dealer: Math.floor(Math.random()*n),
+        points: s.settings.chips ? Object.fromEntries(s.players.map((_,i)=>[i,INIT_POINTS[n]])) : null,
+        roundStart:null, results:[], ranks:null};
+      dealRound();
+      return s;
+    }
+    case 'next': {
+      isHost();
+      if(s.status!=='roundEnd') fail('次のラウンドに進めません');
+      s.match.dealer = (s.match.dealer+1)%n;
+      dealRound();
+      return s;
+    }
+    case 'abort': {
+      isHost();
+      if(s.status!=='playing' && s.status!=='roundEnd') return null;
+      s.status='lobby'; s.match=null; s.hands={}; s.piles={}; s.phase=null;
+      addLog(s,'ホストが対戦を中止しました（戦績には記録されません）');
+      return s;
+    }
+    case 'tolobby': {
+      isHost();
+      if(s.status!=='ended') return null;
+      s.status='lobby'; s.hands={}; s.piles={}; s.match=null;
+      return s;
+    }
+    case 'draw': {
+      myTurn();
+      if(s.phase!=='draw') fail('今は引けません');
+      if(!deckCount(s)){ s.phase='attack'; return s; }
+      const k = s.pileCount===2 ? Number(a.pile) : 0;
+      const p = s.piles[k];
+      if(!p || !p.length) fail('その山にはカードがありません');
+      s.drawn = p.pop(); s.phase='attack'; s.streak=0;
+      if(s.pileCount===2) addLog(s,`${P(me)} が${k===0?'左':'右'}の山から引いた（${colorName(s.drawn)}）`);
+      return s;
+    }
+    case 'guess': {
+      myTurn();
+      if(s.phase!=='attack') fail('先に山札から引いてください');
+      const t = Number(a.target);
+      if(t===me || !s.players[t]) fail('相手のカードを選んでください');
+      const h = hand(s,t);
+      const idx = h.findIndex(c=>c.id===a.cardId);
+      if(idx<0 || h[idx].open) fail('そのカードは選べません');
+      const num = Number(a.num);
+      if(!(num>=0 && num<=11)) fail('数字を選んでください');
+      if(s.drawn===null && s.attackId===null){
+        const ac = hand(s,me).find(c=>c.id===a.attackId);
+        if(!ac || ac.open) fail('アタックに使う自分の伏せカードを選んでください');
+        s.attackId = ac.id;
+      }
+      const tc = h[idx];
+      const ok = numOf(tc.id)===num;
+      s.seq++;
+      s.last = {by:me,target:t,cardId:tc.id,pos:idx+1,num,ok,seq:s.seq,gain:0};
+      const where = `${P(t)} の左から${idx+1}枚目（${colorName(tc.id)}）`;
+      if(ok){
+        tc.open=true; tc.fresh=s.seq; s.streak++;
+        let g = 0;
+        if(pts){ g = 10 + (num===6?10:0); pts[me]+=g; pts[t]-=g; s.last.gain=g; }
+        addLog(s,`${P(me)}：${where}を「${num}」→ 正解${g?`（+${g}点）`:''}`);
+        markOut(t);
+        checkEnd();
+        return s;
+      }
+      addLog(s,`${P(me)}：${where}を「${num}」→ ハズレ`);
+      if(s.drawn!==null){
+        insertCard(s.hands[me],{id:s.drawn,open:true,fresh:s.seq});
+        addLog(s,`${P(me)} は引いたカード（${colorName(s.drawn)}${numOf(s.drawn)}）を公開して加えた`);
+        s.drawn=null;
+      }else{
+        const ac = hand(s,me).find(c=>c.id===s.attackId);
+        ac.open=true; ac.fresh=s.seq;
+        addLog(s,`${P(me)} はアタックに使ったカード（${colorName(ac.id)}${numOf(ac.id)}）を公開`);
+      }
+      markOut(me);
+      if(!checkEnd()) nextTurn();
+      return s;
+    }
+    case 'stop': {
+      myTurn();
+      if(s.phase!=='attack' || s.streak<1) fail('1回以上アタックしてからストップできます');
+      if(s.drawn!==null){
+        s.seq++;
+        insertCard(s.hands[me],{id:s.drawn,open:false,fresh:s.seq});
+        addLog(s,`${P(me)} はストップ。引いたカードを伏せて加えた`);
+      }else addLog(s,`${P(me)} はストップ`);
+      nextTurn();
+      return s;
+    }
+  }
+  fail('不明な操作です');
+}
+
+/* ---- 戦績の集計（記録配列 → 指定プレイヤー視点） ---- */
+function computeStats(games, pid){
+  const mine = games.filter(g=>g.pids.includes(pid)).sort((a,b)=>b.endedAt-a.endedAt);
+  const o = {matches:mine.length, wins:0, rounds:0, roundWins:0, chipGames:0, chipNet:0, vs:{}};
+  mine.forEach(g=>{
+    const me = g.players.find(p=>p.pid===pid);
+    if(me.rank===1) o.wins++;
+    o.rounds += g.rounds.length; o.roundWins += me.roundWins;
+    if(g.settings.chips){ o.chipGames++; o.chipNet += me.points - g.settings.initPoints; }
+    g.players.forEach(op=>{
+      if(op.pid===pid) return;
+      const v = o.vs[op.pid] || (o.vs[op.pid] = {name:op.name, games:0, w:0, l:0, d:0, rw:0, rl:0, diff:0, chipGames:0});
+      v.name = op.name; v.games++;
+      if(me.rank<op.rank) v.w++; else if(me.rank>op.rank) v.l++; else v.d++;
+      g.rounds.forEach(r=>{ if(r.winner===pid) v.rw++; else if(r.winner===op.pid) v.rl++; });
+      if(g.settings.chips){ v.chipGames++; v.diff += me.points - op.points; }
+    });
+  });
+  o.list = mine;
+  return o;
+}
+// ==LOGIC END==
+
+/* ---------------- ストレージ（Firebase / ローカルテスト） ---------------- */
+const params = new URLSearchParams(location.search);
+const LOCAL = params.has('local');
+const rid = () => Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+
+function FireStore(){
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const rooms = db.collection(COL.rooms), players = db.collection(COL.players), games = db.collection(COL.games);
+  return {
+    async listPlayers(){ const q = await players.get(); return q.docs.map(d=>({id:d.id, ...d.data()})); },
+    async addPlayer(name){ const ref = players.doc(); await ref.set({name, createdAt:Date.now()}); return ref.id; },
+    async listGames(pid){ const q = await games.where('pids','array-contains',pid).get(); return q.docs.map(d=>({id:d.id, ...d.data()})); },
+    async create(code,data){
+      const ref = rooms.doc(code);
+      await db.runTransaction(async tx=>{
+        const snap = await tx.get(ref);
+        if(snap.exists && Date.now()-(snap.data().updatedAt||0) < 864e5) throw new Error('exists');
+        tx.set(ref,data);
+      });
+    },
+    async transact(code,fn){
+      const ref = rooms.doc(code);
+      await db.runTransaction(async tx=>{
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw new Error('部屋が見つかりません');
+        const next = fn(snap.data());
+        if(!next) return;
+        const rec = next._record; delete next._record;
+        next.updatedAt = Date.now();
+        tx.set(ref,next);
+        if(rec) tx.set(games.doc(`${code}-${next.createdAt}-${next.matchNo}`), {...rec, room:code});
+      });
+    },
+    subscribe(code,cb){ return rooms.doc(code).onSnapshot(s=>cb(s.exists?s.data():null), e=>toast('同期エラー：'+e.message)); }
+  };
+}
+
+function LocalStore(){ // ?local=1：同じブラウザの複数タブで対戦（Firebase不要の動作確認用）
+  const K = c=>'algo_local_'+c, subs={};
+  const read = k=>{ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } };
+  const emit = c=>(subs[c]||[]).forEach(f=>f(read(K(c))));
+  addEventListener('storage',e=>{ if(e.key && e.key.startsWith('algo_local_')) emit(e.key.slice(11)); });
+  return {
+    async listPlayers(){ return read('algo_localdb_players')||[]; },
+    async addPlayer(name){ const l=read('algo_localdb_players')||[]; const id=rid(); l.push({id,name,createdAt:Date.now()}); localStorage.setItem('algo_localdb_players',JSON.stringify(l)); return id; },
+    async listGames(pid){ return (read('algo_localdb_games')||[]).filter(g=>g.pids.includes(pid)); },
+    async create(c,d){ localStorage.setItem(K(c),JSON.stringify(d)); emit(c); },
+    async transact(c,fn){
+      const s=read(K(c)); if(!s) throw new Error('部屋が見つかりません');
+      const next=fn(s); if(!next) return;
+      const rec=next._record; delete next._record;
+      next.updatedAt=Date.now();
+      if(rec){ const l=read('algo_localdb_games')||[]; l.push({...rec,id:`${c}-${next.createdAt}-${next.matchNo}`,room:c}); localStorage.setItem('algo_localdb_games',JSON.stringify(l)); }
+      localStorage.setItem(K(c),JSON.stringify(next)); emit(c);
+    },
+    subscribe(c,cb){ (subs[c]=subs[c]||[]).push(cb); setTimeout(()=>cb(read(K(c)))); return ()=>{ subs[c]=subs[c].filter(f=>f!==cb); }; }
+  };
+}
+
+const Store = LOCAL ? LocalStore() : FireStore();
+
+/* ---------------- 状態 ---------------- */
+// ローカルテストではタブごとに別人になれるよう sessionStorage を使う
+const idStore = LOCAL ? sessionStorage : localStorage;
+let me = {pid: idStore.getItem('algo_pid'), name: idStore.getItem('algo_pname')};
+let view = 'home';            // home | who | stats | room
+let code=null, state=null, unsub=null, busy=false;
+let ui = {target:null, cardId:null, num:null, attackId:null, sheetHidden:false};
+let lastSeen = {turn:null, seq:null, round:null, status:null};
+let statsView = {pid:null, games:null, players:null};
+const $app = document.getElementById('app');
+const esc = s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let toastTimer;
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2600); }
+const roomUrl = c=>`${location.origin}${location.pathname}?room=${c}${LOCAL?'&local=1':''}`;
+const lastSettings = ()=>{ try{ return JSON.parse(localStorage.getItem('algo_settings'))||{chips:true,deck:'normal'}; }catch(e){ return {chips:true,deck:'normal'}; } };
+const fmtDate = t=>{ const d=new Date(t); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`; };
+const signed = v=> v>0?`+${v}`:`${v}`;
+
+async function act(a){
+  if(busy) return; busy=true;
+  try{ await Store.transact(code, s=>reduce(s,me.pid,a)); }
+  catch(e){ toast(e.message); }
+  finally{ busy=false; }
+}
+
+/* ---------------- プレイヤー ---------------- */
+let whoList = null;
+async function openWho(){
+  view='who'; whoList=null; render();
+  try{ whoList = (await Store.listPlayers()).sort((a,b)=>a.name.localeCompare(b.name,'ja')); }
+  catch(e){ toast('読み込めませんでした：'+e.message); whoList=[]; }
+  render();
+}
+function setMe(p){
+  me={pid:p.id,name:p.name}; idStore.setItem('algo_pid',p.id); idStore.setItem('algo_pname',p.name);
+  const r=params.get('room'); if(r && !code){ joinRoom(r); return; }
+  view='home'; render();
+}
+async function addMe(){
+  const el=document.getElementById('newname'); const name=el.value.trim().slice(0,12);
+  if(!name){ toast('名前を入力してください'); el.focus(); return; }
+  if((whoList||[]).some(p=>p.name===name)){ toast('同じ名前が登録済みです。一覧から選んでください'); return; }
+  try{ const id=await Store.addPlayer(name); setMe({id,name}); }
+  catch(e){ toast('登録できませんでした：'+e.message); }
+}
+
+/* ---------------- 部屋 ---------------- */
+async function createRoom(){
+  for(let i=0;i<8;i++){
+    const c = String(Math.floor(1000+Math.random()*9000));
+    try{ await Store.create(c, newRoom(me.pid,me.name,lastSettings())); enterRoom(c); return; }
+    catch(e){ if(e.message!=='exists'){ toast('作成できませんでした：'+e.message); return; } }
+  }
+  toast('部屋番号が混み合っています。もう一度お試しください');
+}
+async function joinRoom(c){
+  if(!/^\d{4}$/.test(c||'')){ toast('4桁の部屋番号を入力してください'); return; }
+  code = c;
+  try{ await Store.transact(c, s=>reduce(s,me.pid,{type:'join',name:me.name})); enterRoom(c); }
+  catch(e){ toast(e.message); if(e.message.startsWith('対戦中')) enterRoom(c); else { code=null; view='home'; render(); } }
+}
+function enterRoom(c){
+  code=c; view='room'; localStorage.setItem('algo_last',c);
+  history.replaceState(null,'',roomUrl(c));
+  if(unsub) unsub();
+  unsub = Store.subscribe(c, s=>{
+    if(!s){ toast('部屋が見つかりません'); exitRoom(); return; }
+    state=s; syncUi(); render();
+  });
+}
+function exitRoom(){
+  if(unsub) unsub(); unsub=null; state=null; code=null; view='home';
+  history.replaceState(null,'',location.pathname+(LOCAL?'?local=1':''));
+  render();
+}
+async function leaveRoom(){
+  if(state && state.status!=='playing' && state.status!=='roundEnd' && seatOf(state,me.pid)>=0){
+    try{ await Store.transact(code,s=>reduce(s,me.pid,{type:'leave'})); }catch(e){}
+  }
+  localStorage.removeItem('algo_last'); exitRoom();
+}
+async function share(){
+  const url=roomUrl(code);
+  if(navigator.share){ try{ await navigator.share({title:'アルゴ対戦',text:`部屋番号 ${code}`,url}); }catch(e){} return; }
+  try{ await navigator.clipboard.writeText(url); toast('招待リンクをコピーしました'); }catch(e){ toast(url); }
+}
+
+function syncUi(){
+  const s=state, round=s.match?s.match.round:0;
+  if(s.turn!==lastSeen.turn || round!==lastSeen.round || s.status!=='playing'){ ui.target=null; ui.cardId=null; ui.num=null; ui.attackId=null; }
+  else if(s.seq!==lastSeen.seq){ ui.num=null; const c=ui.cardId!==null && hand(s,ui.target).find(x=>x.id===ui.cardId); if(!c||c.open){ ui.target=null; ui.cardId=null; } }
+  if(s.status!==lastSeen.status) ui.sheetHidden=false;
+  lastSeen={turn:s.turn,seq:s.seq,round,status:s.status};
+}
+
+/* ---------------- 描画 ---------------- */
+function cardHtml(c, opt={}){
+  const col = isWhite(c.id)?'w':'b', face = opt.face;
+  const cls = ['card',col, face?'':'back', c.open?'open':'', opt.pick?'pick':'', opt.sel?'sel':'',
+    (c.fresh && state && c.fresh===state.seq)?'fresh':''].join(' ');
+  const label = face ? `${colorName(c.id)}${numOf(c.id)}${c.open?'（公開）':''}` : `${colorName(c.id)}の伏せカード`;
+  const attrs = opt.pick ? `role="button" tabindex="0" data-act="${opt.act}" data-seat="${opt.seat}" data-id="${c.id}"` : '';
+  return `<div class="${cls}" ${attrs} aria-label="${label}">${face?numOf(c.id):''}${opt.tag?`<span class="tag">${opt.tag}</span>`:''}</div>`;
+}
+
+function render(){
+  if(view==='who' || !me.pid) return renderWho();
+  if(view==='stats') return renderStats();
+  if(view==='room' && state){ if(state.status==='lobby') return renderLobby(); return renderGame(); }
+  if(view==='room') { $app.innerHTML='<p class="muted center" style="margin-top:40vh">読み込み中…</p>'; return; }
+  renderHome();
+}
+
+function logoHtml(){ return `<div class="logo" aria-hidden="true">${[['A','b'],['L','w'],['G','b'],['O','w']].map(([t,c])=>`<div class="card ${c}">${t}</div>`).join('')}</div>`; }
+
+function renderWho(){
+  if(whoList===null && view!=='who'){ openWho(); return; }
+  $app.innerHTML = `
+    ${logoHtml()}
+    <p class="lead">あなたは誰ですか？${LOCAL?'<br>（ローカルテストモード）':''}</p>
+    <div class="box">
+      ${whoList===null ? '<p class="muted">読み込み中…</p>' : whoList.length ? `
+        <span class="lbl">登録済みのプレイヤー</span>
+        <div class="names">${whoList.map(p=>`<button data-act="pickme" data-id="${esc(p.id)}" class="${p.id===me.pid?'on':''}">${esc(p.name)}</button>`).join('')}</div>` :
+        '<p class="muted">まだ誰も登録されていません。</p>'}
+    </div>
+    <div class="box">
+      <label for="newname">新しく登録する</label>
+      <div class="split"><input id="newname" maxlength="12" autocomplete="nickname" placeholder="名前"><button class="btn" data-act="addme">登録</button></div>
+      <p class="muted">戦績はこの名前にひもづいて記録されます。</p>
+    </div>
+    ${me.pid ? `<button class="btn sub" data-act="home">戻る</button>`:''}`;
+}
+
+function renderHome(){
+  const pre = params.get('room')||'';
+  const last = localStorage.getItem('algo_last');
+  $app.innerHTML = `
+    ${logoHtml()}
+    <p class="lead">身内で、数字を推理しあう。${LOCAL?'<br>（ローカルテストモード）':''}</p>
+    <div class="box">
+      <div class="who"><b>${esc(me.name)}</b><button data-act="who">プレイヤーを変更</button></div>
+      <button class="btn" data-act="create">部屋を作る</button>
+    </div>
+    <div class="box">
+      <label for="code">部屋番号で入る</label>
+      <div class="split"><input id="code" class="code" inputmode="numeric" maxlength="4" placeholder="0000" value="${esc(pre)}">
+      <button class="btn" data-act="join">入る</button></div>
+      ${last && last!==pre ? `<button class="btn sub" data-act="rejoin">前の部屋（${esc(last)}）に戻る</button>`:''}
+    </div>
+    <button class="btn sub" data-act="stats">戦績を見る</button>`;
+}
+
+function segHtml(k, opts, cur, enabled){
+  return `<div class="seg" role="group">${opts.map(([v,t])=>`<button data-act="set" data-k="${k}" data-v="${v}" class="${String(cur)===String(v)?'on':''}" ${enabled?'':'disabled'} aria-pressed="${String(cur)===String(v)}">${t}</button>`).join('')}</div>`;
+}
+
+function renderLobby(){
+  const s=state, seat=seatOf(s,me.pid), isHost=s.host===me.pid, n=s.players.length;
+  const digits=[...code].map((d,i)=>`<div class="card ${i%2?'w':'b'}">${d}</div>`).join('');
+  const st=s.settings;
+  $app.innerHTML = `
+    <div class="top"><span>部屋番号</span><button data-act="leave">部屋を出る</button></div>
+    <div class="code" aria-label="部屋番号 ${code}">${digits}</div>
+    <div class="box">
+      <ul class="plist">${s.players.map(p=>`<li><span>${esc(p.name)}${p.uid===me.pid?'（あなた）':''}</span><span class="muted">${p.uid===s.host?'ホスト':''}</span></li>`).join('')}</ul>
+      <p class="muted">${n}/4人。配る枚数は 2人:4枚／3人:3枚／4人:2枚</p>
+      <button class="btn sub" data-act="share">招待リンクを送る</button>
+    </div>
+    <div class="box">
+      <div><span class="lbl">ポイントチップ</span>${segHtml('chips',[[true,'あり'],[false,'なし']],st.chips,isHost)}</div>
+      <p class="muted">${st.chips ? `全員が1回ずつ親をやる${n}ラウンド制。持ち点 ${INIT_POINTS[n]||'—'}点。正解で相手から10点（6なら20点）、ラウンド勝者は裏の枚数×10点（6は1枚につき+10点）を全員から受け取ります。` : '1ラウンドで決着します。'}</p>
+      <div><span class="lbl">山札</span>${segHtml('deck',[['normal','1つ（ノーマル）'],['local','2つ（ローカル）']],st.deck,isHost)}</div>
+      <p class="muted">${st.deck==='local' ? '残りを左右2つの山に分けます。引くときにどちらの山か選べます。各山の一番上と、その下のカードの色が見えます。' : '山札は1つ。一番上のカードの色が見えます。'}</p>
+      ${seat<0 ? `<button class="btn" data-act="joinhere">この部屋に参加する</button>` :
+        isHost ? `<button class="btn" data-act="start" ${n<2?'disabled':''}>対戦を始める</button>` :
+        `<p class="muted center">ホストの開始を待っています…</p>`}
+    </div>`;
+}
+
+function pilesHtml(s, canDraw){
+  const local = s.pileCount===2;
+  return pileArr(s).map((p,i)=>{
+    const top=p[p.length-1], sec=p[p.length-2];
+    const label = local ? (i===0?'左の山':'右の山') : '山札';
+    const can = canDraw && p.length>0;
+    const peek = p.length ? (local ? `上 ${colorName(top)}${sec!==undefined?`／次 ${colorName(sec)}`:''}` : `上 ${colorName(top)}`) : 'なし';
+    return `<button class="pile ${can?'can':''}" ${can?`data-act="draw" data-pile="${i}"`:'disabled'} aria-label="${label} 残り${p.length}枚 ${peek}">
+      <div class="stackv">${p.length?`${local&&sec!==undefined?`<div class="pc under ${isWhite(sec)?'w':'b'}"></div>`:''}<div class="pc top ${isWhite(top)?'w':'b'}"></div>`:'<div class="pc none"></div>'}</div>
+      <span>${label} ${p.length}</span><span class="peek">${peek}</span></button>`;
+  }).join('');
+}
+
+function renderGame(){
+  const s=state, seat=seatOf(s,me.pid), n=s.players.length;
+  const playing = s.status==='playing', showAll = !playing;
+  const pts = s.match && s.match.points;
+  const myTurn = playing && seat===s.turn;
+  const attacking = myTurn && s.phase==='attack';
+  const needAttackCard = attacking && s.drawn===null && s.attackId===null;
+  const order = seat>=0 ? [...Array(n-1)].map((_,k)=>(seat+1+k)%n) : [...Array(n).keys()];
+  const ptsHtml = i => pts ? `<span class="pts">${pts[i]}点</span>` : '';
+
+  const opps = order.map(i=>{
+    const h=hand(s,i), hid=hiddenCount(s,i), isTurn=playing && s.turn===i;
+    const cards = h.map(c=>cardHtml(c,{face:c.open||showAll, pick:attacking && !c.open, act:'target', seat:i, sel:ui.target===i && ui.cardId===c.id})).join('');
+    const st = !playing ? (s.winner===i?'<span class="now">ラウンド勝利</span>':'') : hid===0 ? '全公開' : isTurn ? '<span class="now">手番</span>' : `伏せ ${hid}枚`;
+    return `<section class="opp ${isTurn?'turn':''} ${playing&&hid===0?'out':''}"><div class="head"><span><b>${esc(s.players[i].name)}</b>${ptsHtml(i)}</span><span>${st}</span></div><div class="row">${cards}</div></section>`;
+  }).join('');
+
+  const turnName = esc(s.players[s.turn]?.name||'');
+  const drawnHtml = (s.drawn!==null && playing) ? `<div class="drawn">${cardHtml({id:s.drawn,open:false,fresh:0},{face:myTurn})}<span>引いたカード</span></div>` : '';
+  const L = s.last;
+  const lastHtml = L ? `<div class="result ${L.ok?'ok':'ng'}">${esc(s.players[L.by].name)} → ${esc(s.players[L.target].name)}の${L.pos}枚目に「${L.num}」… ${L.ok?`正解${L.gain?`（+${L.gain}点）`:''}`:'ハズレ'}</div>` : '';
+  let msg='';
+  if(!playing) msg='';
+  else if(!myTurn) msg = `${turnName} さんの番です`;
+  else if(s.phase==='draw') msg = s.pileCount===2 ? 'あなたの番です。引く山を選んでください' : 'あなたの番です。山札から1枚引いてください';
+  else if(needAttackCard && ui.attackId===null) msg = '山札がありません。アタックに使う自分の伏せカードを1枚選んでください（ハズレたら公開）';
+  else if(ui.cardId===null) msg = s.streak>0 ? '正解！続けて当てるか、ストップするか選んでください' : '当てたい相手のカードを選んでください';
+  else if(ui.num===null) msg = '数字を選んでください';
+  else msg = `${esc(s.players[ui.target].name)}の${colorName(ui.cardId)}を「${ui.num}」でアタック`;
+
+  let controls='';
+  if(myTurn && s.phase==='draw' && s.pileCount!==2){
+    controls = `<button class="btn" data-act="draw" data-pile="0">山札から1枚引く</button>`;
+  }else if(attacking){
+    const col = ui.cardId!==null ? (isWhite(ui.cardId)?'w':'b') : 'b';
+    const pad = ui.cardId!==null ? `<div class="pad ${col}" role="group" aria-label="数字">${[...Array(12).keys()].map(k=>`<button data-act="num" data-n="${k}" class="${ui.num===k?'on':''}">${k}</button>`).join('')}</div>` : '';
+    const ready = ui.cardId!==null && ui.num!==null && !(needAttackCard && ui.attackId===null);
+    controls = `${pad}<button class="btn" data-act="guess" ${ready?'':'disabled'}>アタック</button>
+      ${s.streak>0 ? `<button class="btn sub" data-act="stop">${s.drawn!==null?'ストップ（引いたカードを伏せて加える）':'ストップ'}</button>`:''}`;
+  }
+
+  let mine='';
+  if(seat>=0){
+    const cards = hand(s,seat).map(c=>{
+      const sel = (s.attackId===c.id) || (needAttackCard && ui.attackId===c.id);
+      return cardHtml(c,{face:true, pick:needAttackCard && !c.open, act:'attackcard', seat, sel, tag:c.open?'':'伏'});
+    }).join('');
+    const hid=hiddenCount(s,seat);
+    mine = `<section class="mine lg"><div class="head"><span><b>あなた</b>${ptsHtml(seat)}</span><span>${playing&&hid===0?'全公開':`伏せ ${hid}枚`}</span></div><div class="row">${cards}</div></section>`;
+  }
+
+  const log = `<details><summary>ログ（${s.log.length}）</summary><ol reversed>${s.log.slice().reverse().map(t=>`<li>${esc(t)}</li>`).join('')}</ol></details>`;
+  const isHost = s.host===me.pid;
+  const roundLabel = s.match ? `第${s.match.round}/${s.match.rounds}ラウンド` : '';
+
+  $app.innerHTML = `
+    <div class="top"><span>部屋 ${esc(code)}　${roundLabel}${seat<0?'（観戦中）':''}</span>
+      <span class="r">${isHost && s.status!=='ended' ? '<button data-act="abort">中止</button>':''}<button data-act="share">招待</button></span></div>
+    ${opps}
+    <div class="mid">${pilesHtml(s, myTurn && s.phase==='draw')}${drawnHtml}<div class="msg">${lastHtml}<div>${msg}</div></div></div>
+    <div class="actions">${controls}</div>
+    ${mine}
+    ${log}
+    ${!playing ? sheetHtml(s) : ''}`;
+}
+
+function sheetHtml(s){
+  if(ui.sheetHidden) return `<div class="peekbar"><button class="btn" data-act="sheet">結果に戻る</button></div>`;
+  const m=s.match, pts=m && m.points, isHost=s.host===me.pid, n=s.players.length;
+  const w = s.players[s.winner];
+  const r = m.results[m.results.length-1];
+  if(s.status==='roundEnd'){
+    const rows = s.players.map((p,i)=>{ const d=m.points[i]-m.roundStart[i]; return `<tr><td>${esc(p.name)}</td><td>${m.points[i]}</td><td class="${d>0?'plus':d<0?'minus':''}">${signed(d)}</td></tr>`; }).join('');
+    return `<div class="overlay"><div class="sheet">
+      <h2>${w.uid===me.pid?'あなた':esc(w.name)} のラウンド勝利</h2>
+      <p class="muted">裏${r.hidden}枚${r.six?`（6が${r.six}枚）`:''} → 各プレイヤーから${r.settle}点</p>
+      <div class="tbl"><table><thead><tr><th>プレイヤー</th><th>持ち点</th><th>このラウンド</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${isHost ? `<button class="btn" data-act="next">次のラウンドへ（${m.round+1}/${m.rounds}）</button>` : `<p class="muted center">ホストが次のラウンドを始めるのを待っています…</p>`}
+      <button class="btn sub" data-act="sheet">盤面を見る</button>
+    </div></div>`;
+  }
+  // 対戦終了
+  const ranked = s.players.map((p,i)=>({p,i,rank:m.ranks[i]})).sort((a,b)=>a.rank-b.rank);
+  const rows = ranked.map(x=>`<tr><td>${x.rank}位　${esc(x.p.name)}</td>${pts?`<td>${m.points[x.i]}</td><td class="${m.points[x.i]-INIT_POINTS[n]>0?'plus':m.points[x.i]-INIT_POINTS[n]<0?'minus':''}">${signed(m.points[x.i]-INIT_POINTS[n])}</td>`:''}<td>${m.results.filter(r=>r.winner===x.i).length}</td></tr>`).join('');
+  const champs = ranked.filter(x=>x.rank===1);
+  const title = champs.some(x=>x.p.uid===me.pid) ? (champs.length>1?'同率優勝！':'あなたの優勝！') : `${champs.map(x=>esc(x.p.name)).join('・')} の優勝`;
+  return `<div class="overlay"><div class="sheet">
+    <h2>${title}</h2>
+    <div class="tbl"><table><thead><tr><th>順位</th>${pts?'<th>持ち点</th><th>収支</th>':''}<th>ラウンド勝利</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted">戦績に記録しました。</p>
+    ${isHost ? `<button class="btn" data-act="start">同じ設定でもう一度</button><button class="btn sub" data-act="tolobby">ロビーに戻って設定を変える</button>` : `<p class="muted center">ホストの再開を待っています…</p>`}
+    <div class="split"><button class="btn sub" data-act="sheet">盤面を見る</button><button class="btn sub" data-act="stats">戦績</button></div>
+    <button class="btn sub" data-act="leave">部屋を出る</button>
+  </div></div>`;
+}
+
+/* ---------------- 戦績 ---------------- */
+async function openStats(pid){
+  view='stats'; statsView.pid = pid || statsView.pid || me.pid; statsView.games=null; render();
+  try{
+    const [games, players] = await Promise.all([Store.listGames(statsView.pid), statsView.players ? Promise.resolve(statsView.players) : Store.listPlayers()]);
+    statsView.games = games; statsView.players = players;
+  }catch(e){ toast('読み込めませんでした：'+e.message); statsView.games=[]; statsView.players=statsView.players||[]; }
+  render();
+}
+
+function renderStats(){
+  const pid = statsView.pid;
+  const players = statsView.players || [];
+  const nameOf = id => (players.find(p=>p.id===id)||{}).name;
+  const back = code ? '部屋に戻る' : '戻る';
+  let body = '<p class="muted">読み込み中…</p>';
+  if(statsView.games){
+    const st = computeStats(statsView.games, pid);
+    const rate = st.matches ? Math.round(st.wins/st.matches*100) : 0;
+    const vsRows = Object.entries(st.vs).sort((a,b)=>b[1].games-a[1].games).map(([id,v])=>
+      `<tr><td>${esc(nameOf(id)||v.name)}</td><td>${v.games}</td><td>${v.w}-${v.l}${v.d?`-${v.d}`:''}</td><td>${v.rw}-${v.rl}</td><td class="${v.diff>0?'plus':v.diff<0?'minus':''}">${v.chipGames?signed(v.diff):'—'}</td></tr>`).join('');
+    const hist = st.list.map(g=>{
+      const ps = g.players.slice().sort((a,b)=>a.rank-b.rank);
+      const self = g.players.find(p=>p.pid===pid);
+      const tags = [g.settings.chips?'チップあり':'チップなし', g.settings.deck==='local'?'山2つ':'山1つ', `${g.players.length}人`].join('／');
+      const rounds = g.rounds.map((r,k)=>`R${k+1}：${esc(g.players.find(p=>p.pid===r.winner)?.name||'')} 勝利`).join('<br>');
+      return `<li><details><summary><span>${fmtDate(g.endedAt)}<br><span class="tags">${tags}</span></span><span class="${self.rank===1?'me':''}">${self.rank}位${g.settings.chips?`　${signed(self.points-g.settings.initPoints)}`:''}</span></summary>
+        <div class="tbl" style="margin-top:8px"><table><tbody>${ps.map(p=>`<tr><td class="${p.pid===pid?'me':''}">${p.rank}位　${esc(p.name)}</td>${g.settings.chips?`<td>${p.points}点</td>`:''}<td>R勝 ${p.roundWins}</td></tr>`).join('')}</tbody></table></div>
+        <p class="sub" style="margin-top:6px">${rounds}</p></details></li>`;
+    }).join('');
+    body = `
+      <div class="stats">
+        <div class="stat"><b>${st.matches}</b><span>対戦数</span></div>
+        <div class="stat"><b>${st.wins}<small style="font-size:14px">（${rate}%）</small></b><span>優勝</span></div>
+        <div class="stat"><b>${st.roundWins}/${st.rounds}</b><span>ラウンド勝利</span></div>
+        <div class="stat"><b class="${st.chipNet>0?'plus':''}">${st.chipGames?signed(st.chipNet):'—'}</b><span>チップ収支（${st.chipGames}戦）</span></div>
+      </div>
+      <h3>対戦相手別</h3>
+      ${vsRows ? `<div class="tbl"><table><thead><tr><th>相手</th><th>対戦</th><th>勝-敗</th><th>ラウンド</th><th>点差計</th></tr></thead><tbody>${vsRows}</tbody></table></div>
+      <p class="muted">勝-敗はその対戦で相手より上位だったか。ラウンドはお互いが勝ったラウンド数。点差計はチップ戦での最終持ち点の差の合計。</p>` : '<p class="muted">まだ対戦記録がありません。</p>'}
+      <h3>履歴</h3>
+      ${hist ? `<ul class="hist">${hist}</ul>` : '<p class="muted">対戦が終わるとここに記録されます。</p>'}`;
+  }
+  $app.innerHTML = `
+    <div class="top"><span>戦績</span><button data-act="${code?'backroom':'home'}">${back}</button></div>
+    <div class="names">${players.map(p=>`<button data-act="statsof" data-id="${esc(p.id)}" class="${p.id===pid?'on':''}">${esc(p.name)}</button>`).join('')}</div>
+    <div class="box">${body}</div>`;
+}
+
+/* ---------------- 操作 ---------------- */
+function handle(el){
+  const a=el.dataset.act;
+  switch(a){
+    case 'who': return openWho();
+    case 'pickme': { const p=whoList.find(x=>x.id===el.dataset.id); if(p) setMe(p); return; }
+    case 'addme': return addMe();
+    case 'home': view='home'; return render();
+    case 'stats': return openStats(me.pid);
+    case 'statsof': return openStats(el.dataset.id);
+    case 'backroom': view='room'; return render();
+    case 'create': return createRoom();
+    case 'join': return joinRoom(document.getElementById('code').value.trim());
+    case 'rejoin': return joinRoom(localStorage.getItem('algo_last'));
+    case 'joinhere': return joinRoom(code);
+    case 'leave': return leaveRoom();
+    case 'share': return share();
+    case 'set': {
+      const k=el.dataset.k, v = k==='chips' ? el.dataset.v==='true' : el.dataset.v;
+      const saved = {...lastSettings(), [k]:v}; localStorage.setItem('algo_settings',JSON.stringify(saved));
+      return act({type:'settings',[k]:v});
+    }
+    case 'start': return act({type:'start'});
+    case 'next': return act({type:'next'});
+    case 'tolobby': return act({type:'tolobby'});
+    case 'abort': if(confirm('対戦を中止しますか？（戦績には記録されません）')) act({type:'abort'}); return;
+    case 'sheet': ui.sheetHidden=!ui.sheetHidden; return render();
+    case 'draw': return act({type:'draw',pile:Number(el.dataset.pile||0)});
+    case 'stop': return act({type:'stop'});
+    case 'target':
+      if(ui.cardId===Number(el.dataset.id) && ui.target===Number(el.dataset.seat)){ ui.target=null; ui.cardId=null; }
+      else { ui.target=Number(el.dataset.seat); ui.cardId=Number(el.dataset.id); }
+      ui.num=null; return render();
+    case 'attackcard': ui.attackId = ui.attackId===Number(el.dataset.id)?null:Number(el.dataset.id); return render();
+    case 'num': ui.num=Number(el.dataset.n); return render();
+    case 'guess': return act({type:'guess',target:ui.target,cardId:ui.cardId,num:ui.num,attackId:state.attackId??ui.attackId});
+  }
+}
+$app.addEventListener('click',e=>{ const el=e.target.closest('[data-act]'); if(el && !el.disabled) handle(el); });
+$app.addEventListener('keydown',e=>{
+  if(e.key==='Enter' && e.target.id==='code'){ joinRoom(e.target.value.trim()); return; }
+  if(e.key==='Enter' && e.target.id==='newname'){ addMe(); return; }
+  if((e.key==='Enter'||e.key===' ') && e.target.classList.contains('card') && e.target.dataset.act){ e.preventDefault(); handle(e.target); }
+});
+
+/* ---------------- 起動 ---------------- */
+(function(){
+  if(!me.pid){ openWho(); return; }
+  const r = params.get('room');
+  if(r) joinRoom(r); else render();
+})();
+</script>
+</body>
+</html>
