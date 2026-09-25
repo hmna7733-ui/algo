@@ -143,6 +143,33 @@ td.plus{color:var(--hit)} td.minus{color:var(--miss)}
 .hist .me{color:var(--accent);font-weight:700}
 .tags{font-size:12px;color:var(--muted)}
 
+/* 6的中エフェクト */
+.card.open.six{box-shadow:0 0 0 2px var(--accent),0 0 12px rgba(227,178,60,.55)}
+.card .tag.new{color:var(--accent);opacity:1}
+.card.b .tag.new,.card.w .tag.new{background:var(--accent);color:var(--black);border-radius:3px;left:5px;right:5px;top:3px}
+.lastatk{margin-top:8px;font-size:12px;color:var(--muted)}
+.lastatk .ok{color:var(--hit);font-weight:700}.lastatk .ng{color:var(--miss);font-weight:700}
+.six-fx{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;animation:fxbg 2.4s ease-out forwards}
+.six-fx .burst{position:absolute;width:220vmax;height:220vmax;left:50%;top:50%;margin:-110vmax 0 0 -110vmax;
+  background:repeating-conic-gradient(rgba(227,178,60,.30) 0 7deg,transparent 7deg 22deg);
+  -webkit-mask:radial-gradient(circle,#000 0,transparent 45%);mask:radial-gradient(circle,#000 0,transparent 45%);animation:spin 2.4s linear both,fadein .3s both}
+.six-fx .ring{position:absolute;width:150px;height:150px;border-radius:50%;border:3px solid var(--accent);animation:ring 1s ease-out .3s both}
+.six-fx .ring.r2{animation-delay:.5s;border-width:2px}
+.six-fx .big{width:124px;height:178px;font-size:104px;border-radius:14px;position:relative;z-index:2;
+  box-shadow:0 0 0 4px var(--accent),0 0 70px rgba(227,178,60,.85);animation:flip .75s cubic-bezier(.2,1.5,.4,1) both}
+.six-fx .spark{position:absolute;width:5px;height:22px;border-radius:3px;background:var(--accent);left:50%;top:50%;margin:-11px 0 0 -2.5px;
+  transform:rotate(var(--a)) translateY(-40px);animation:spark .9s ease-out .35s both}
+.six-fx .cap{margin-top:26px;font-weight:900;font-size:22px;color:var(--ink);text-shadow:0 2px 14px #000;position:relative;z-index:2;animation:cap .45s .55s both}
+.six-fx .cap small{display:block;text-align:center;color:var(--accent);font-size:28px;margin-top:4px}
+@keyframes fxbg{0%{background:rgba(12,16,14,0)}12%{background:rgba(12,16,14,.8)}78%{opacity:1}100%{opacity:0;background:rgba(12,16,14,.8)}}
+@keyframes spin{to{transform:rotate(90deg)}}
+@keyframes fadein{from{opacity:0}}
+@keyframes ring{0%{transform:scale(.4);opacity:1}100%{transform:scale(4.2);opacity:0}}
+@keyframes flip{0%{transform:perspective(700px) rotateY(180deg) scale(.25);opacity:0}50%{opacity:1}100%{transform:perspective(700px) rotateY(0) scale(1)}}
+@keyframes spark{0%{transform:rotate(var(--a)) translateY(-40px) scaleY(1);opacity:1}100%{transform:rotate(var(--a)) translateY(-260px) scaleY(.2);opacity:0}}
+@keyframes cap{from{transform:translateY(14px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.six-fx .burst,.six-fx .ring,.six-fx .spark{display:none}.six-fx .big,.six-fx .cap{animation:fadein .3s both}}
+
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
   background:var(--ink);color:var(--black);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:700;
   opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;z-index:10}
@@ -192,7 +219,7 @@ function insertCard(h,c){ h.push(c); h.sort((a,b)=>a.id-b.id); }
 function newRoom(uid,name,settings){
   settings = settings || {};
   return {status:'lobby',host:uid,players:[{uid,name}],
-    settings:{chips:!!settings.chips, deck:settings.deck==='local'?'local':'normal'},
+    settings:{chips:!!settings.chips, deck:settings.deck==='local'?'local':'normal', log:settings.log==='pro'?'pro':'full'},
     hands:{},piles:{},pileCount:1,turn:0,phase:null,drawn:null,attackId:null,streak:0,
     last:null,winner:null,outOrder:[],log:[],seq:0,match:null,matchNo:0,
     createdAt:Date.now(),updatedAt:Date.now()};
@@ -218,12 +245,12 @@ function reduce(s0, uid, a){
     }else{ s.piles = {0:deck}; s.pileCount = 1; }
     s.match.round++;
     if(s.match.points) s.match.roundStart = clone(s.match.points);
-    Object.assign(s,{status:'playing',turn:s.match.dealer,phase:'draw',drawn:null,attackId:null,streak:0,last:null,winner:null,outOrder:[],seq:0});
+    Object.assign(s,{status:'playing',turn:s.match.dealer,phase:'draw',drawn:null,drawnFrom:null,attackId:null,streak:0,last:null,lastAtk:{},lastPlaced:null,winner:null,outOrder:[],seq:0});
     addLog(s,`── 第${s.match.round}/${s.match.rounds}ラウンド開始（親：${P(s.turn)}）`);
   };
 
   const nextTurn = () => {
-    s.drawn=null; s.attackId=null; s.streak=0;
+    s.drawn=null; s.drawnFrom=null; s.attackId=null; s.streak=0;
     let i=s.turn;
     for(let k=0;k<n;k++){ i=(i+1)%n; if(hiddenCount(s,i)>0) break; }
     s.turn=i;
@@ -243,7 +270,7 @@ function reduce(s0, uid, a){
     addLog(s,`対戦終了。優勝：${top}`);
     s._record = {
       endedAt: Date.now(),
-      settings: {chips:!!m.points, deck:s.settings.deck, initPoints: m.points ? INIT_POINTS[n] : null},
+      settings: {chips:!!m.points, deck:s.settings.deck, log:s.settings.log||'full', initPoints: m.points ? INIT_POINTS[n] : null},
       pids: s.players.map(p=>p.uid),
       players: s.players.map((p,i)=>({pid:p.uid, name:p.name, rank:ranks[i],
         points: m.points ? m.points[i] : null,
@@ -295,6 +322,7 @@ function reduce(s0, uid, a){
       if(s.status==='playing' || s.status==='roundEnd') fail('対戦中は変更できません');
       if(a.chips!==undefined) s.settings.chips = !!a.chips;
       if(a.deck!==undefined) s.settings.deck = a.deck==='local' ? 'local' : 'normal';
+      if(a.log!==undefined) s.settings.log = a.log==='pro' ? 'pro' : 'full';
       return s;
     }
     case 'start': {
@@ -336,7 +364,7 @@ function reduce(s0, uid, a){
       const k = s.pileCount===2 ? Number(a.pile) : 0;
       const p = s.piles[k];
       if(!p || !p.length) fail('その山にはカードがありません');
-      s.drawn = p.pop(); s.phase='attack'; s.streak=0;
+      s.drawn = p.pop(); s.drawnFrom = s.pileCount===2 ? k : null; s.phase='attack'; s.streak=0;
       if(s.pileCount===2) addLog(s,`${P(me)} が${k===0?'左':'右'}の山から引いた（${colorName(s.drawn)}）`);
       return s;
     }
@@ -359,11 +387,14 @@ function reduce(s0, uid, a){
       const ok = numOf(tc.id)===num;
       s.seq++;
       s.last = {by:me,target:t,cardId:tc.id,pos:idx+1,num,ok,seq:s.seq,gain:0};
-      const where = `${P(t)} の左から${idx+1}枚目（${colorName(tc.id)}）`;
+      if(!s.lastAtk) s.lastAtk={};
+      s.lastAtk[me] = s.last;
+      const where = `${P(t)} の小さい方から${idx+1}枚目（${colorName(tc.id)}）`;
       if(ok){
         tc.open=true; tc.fresh=s.seq; s.streak++;
         let g = 0;
         if(pts){ g = 10 + (num===6?10:0); pts[me]+=g; pts[t]-=g; s.last.gain=g; }
+        s.lastAtk[me] = s.last;
         addLog(s,`${P(me)}：${where}を「${num}」→ 正解${g?`（+${g}点）`:''}`);
         markOut(t);
         checkEnd();
@@ -372,6 +403,7 @@ function reduce(s0, uid, a){
       addLog(s,`${P(me)}：${where}を「${num}」→ ハズレ`);
       if(s.drawn!==null){
         insertCard(s.hands[me],{id:s.drawn,open:true,fresh:s.seq});
+        s.lastPlaced = {seat:me, cardId:s.drawn};
         addLog(s,`${P(me)} は引いたカード（${colorName(s.drawn)}${numOf(s.drawn)}）を公開して加えた`);
         s.drawn=null;
       }else{
@@ -389,6 +421,7 @@ function reduce(s0, uid, a){
       if(s.drawn!==null){
         s.seq++;
         insertCard(s.hands[me],{id:s.drawn,open:false,fresh:s.seq});
+        s.lastPlaced = {seat:me, cardId:s.drawn};
         addLog(s,`${P(me)} はストップ。引いたカードを伏せて加えた`);
       }else addLog(s,`${P(me)} はストップ`);
       nextTurn();
@@ -497,7 +530,8 @@ const esc = s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 let toastTimer;
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2600); }
 const roomUrl = c=>`${location.origin}${location.pathname}?room=${c}${LOCAL?'&local=1':''}`;
-const lastSettings = ()=>{ try{ return JSON.parse(localStorage.getItem('algo_settings'))||{chips:true,deck:'normal'}; }catch(e){ return {chips:true,deck:'normal'}; } };
+const DEFAULT_SETTINGS = {chips:true,deck:'normal',log:'full'};
+const lastSettings = ()=>{ try{ return {...DEFAULT_SETTINGS, ...(JSON.parse(localStorage.getItem('algo_settings'))||{})}; }catch(e){ return {...DEFAULT_SETTINGS}; } };
 const fmtDate = t=>{ const d=new Date(t); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`; };
 const signed = v=> v>0?`+${v}`:`${v}`;
 
@@ -570,22 +604,39 @@ async function share(){
   try{ await navigator.clipboard.writeText(url); toast('招待リンクをコピーしました'); }catch(e){ toast(url); }
 }
 
+let fxShown=null;
+function sixEffect(cardId, byName, isMe, gain){
+  document.querySelectorAll('.six-fx').forEach(e=>e.remove());
+  const fx=document.createElement('div'); fx.className='six-fx'; fx.setAttribute('role','alert');
+  const sparks=[...Array(16)].map((_,i)=>`<i class="spark" style="--a:${i*22.5}deg"></i>`).join('');
+  fx.innerHTML=`<div class="burst"></div><div class="ring"></div><div class="ring r2"></div>${sparks}
+    <div class="big card ${isWhite(cardId)?'w':'b'}">6</div>
+    <div class="cap">${isMe?'あなた':esc(byName)}が 6 を撃ち抜いた${gain?`<small>+${gain}点</small>`:''}</div>`;
+  document.body.appendChild(fx);
+  if(navigator.vibrate) navigator.vibrate([30,50,120]);
+  setTimeout(()=>fx.remove(),2400);
+}
 function syncUi(){
   const s=state, round=s.match?s.match.round:0;
   if(s.turn!==lastSeen.turn || round!==lastSeen.round || s.status!=='playing'){ ui.target=null; ui.cardId=null; ui.num=null; ui.attackId=null; }
   else if(s.seq!==lastSeen.seq){ ui.num=null; const c=ui.cardId!==null && hand(s,ui.target).find(x=>x.id===ui.cardId); if(!c||c.open){ ui.target=null; ui.cardId=null; } }
   if(s.status!==lastSeen.status) ui.sheetHidden=false;
+  // 6的中エフェクト（部屋に入った時点の古い結果では鳴らさない）
+  const L=s.last;
+  if(L && L.ok && L.num===6 && lastSeen.seq!==null && L.seq!==lastSeen.seq && round===lastSeen.round && fxShown!==`${round}-${L.seq}`){
+    fxShown=`${round}-${L.seq}`; sixEffect(L.cardId, s.players[L.by].name, L.by===seatOf(s,me.pid), L.gain);
+  }
   lastSeen={turn:s.turn,seq:s.seq,round,status:s.status};
 }
 
 /* ---------------- 描画 ---------------- */
 function cardHtml(c, opt={}){
   const col = isWhite(c.id)?'w':'b', face = opt.face;
-  const cls = ['card',col, face?'':'back', c.open?'open':'', opt.pick?'pick':'', opt.sel?'sel':'',
+  const cls = ['card',col, face?'':'back', c.open?'open':'', opt.pick?'pick':'', opt.sel?'sel':'', opt.six?'six':'',
     (c.fresh && state && c.fresh===state.seq)?'fresh':''].join(' ');
   const label = face ? `${colorName(c.id)}${numOf(c.id)}${c.open?'（公開）':''}` : `${colorName(c.id)}の伏せカード`;
   const attrs = opt.pick ? `role="button" tabindex="0" data-act="${opt.act}" data-seat="${opt.seat}" data-id="${c.id}"` : '';
-  return `<div class="${cls}" ${attrs} aria-label="${label}">${face?numOf(c.id):''}${opt.tag?`<span class="tag">${opt.tag}</span>`:''}</div>`;
+  return `<div class="${cls}" ${attrs} aria-label="${label}">${face?numOf(c.id):''}${opt.tag?`<span class="tag ${opt.tag==='新'?'new':''}">${opt.tag}</span>`:''}</div>`;
 }
 
 function render(){
@@ -657,6 +708,8 @@ function renderLobby(){
       <p class="muted">${st.chips ? `全員が1回ずつ親をやる${n}ラウンド制。持ち点 ${INIT_POINTS[n]||'—'}点。正解で相手から10点（6なら20点）、ラウンド勝者は裏の枚数×10点（6は1枚につき+10点）を全員から受け取ります。` : '1ラウンドで決着します。'}</p>
       <div><span class="lbl">山札</span>${segHtml('deck',[['normal','1つ（ノーマル）'],['local','2つ（ローカル）']],st.deck,isHost)}</div>
       <p class="muted">${st.deck==='local' ? '残りを左右2つの山に分けます。引くときにどちらの山か選べます。各山の一番上と、その下のカードの色が見えます。' : '山札は1つ。一番上のカードの色が見えます。'}</p>
+      <div><span class="lbl">ログ</span>${segHtml('log',[['full','初心者卓'],['pro','上級卓']],st.log||'full',isHost)}</div>
+      <p class="muted">${st.log==='pro' ? '各プレイヤーの前回のアタックと、新しく伏せたカードの位置だけを表示します。流れは自分で覚えておく必要があります。' : 'これまでのアタックをすべてログで見返せます。'}</p>
       ${seat<0 ? `<button class="btn" data-act="joinhere">この部屋に参加する</button>` :
         isHost ? `<button class="btn" data-act="start" ${n<2?'disabled':''}>対戦を始める</button>` :
         `<p class="muted center">ホストの開始を待っています…</p>`}
@@ -686,17 +739,20 @@ function renderGame(){
   const order = seat>=0 ? [...Array(n-1)].map((_,k)=>(seat+1+k)%n) : [...Array(n).keys()];
   const ptsHtml = i => pts ? `<span class="pts">${pts[i]}点</span>` : '';
 
+  const isNew = (i,c) => playing && s.lastPlaced && s.lastPlaced.seat===i && s.lastPlaced.cardId===c.id && !c.open;
   const opps = order.map(i=>{
     const h=hand(s,i), hid=hiddenCount(s,i), isTurn=playing && s.turn===i;
-    const cards = h.map(c=>cardHtml(c,{face:c.open||showAll, pick:attacking && !c.open, act:'target', seat:i, sel:ui.target===i && ui.cardId===c.id})).join('');
+    const cards = h.slice().reverse().map(c=>cardHtml(c,{face:c.open||showAll, pick:attacking && !c.open, act:'target', seat:i, sel:ui.target===i && ui.cardId===c.id, tag:isNew(i,c)?'新':'', six:c.open&&numOf(c.id)===6})).join('');
+    const la = playing && s.lastAtk && s.lastAtk[i];
+    const laHtml = la ? `<div class="lastatk">前回：${la.target===seat?'あなた':esc(s.players[la.target].name)}の小さい方から${la.pos}枚目に「${la.num}」→ <span class="${la.ok?'ok':'ng'}">${la.ok?'正解':'ハズレ'}</span></div>` : '';
     const st = !playing ? (s.winner===i?'<span class="now">ラウンド勝利</span>':'') : hid===0 ? '全公開' : isTurn ? '<span class="now">手番</span>' : `伏せ ${hid}枚`;
-    return `<section class="opp ${isTurn?'turn':''} ${playing&&hid===0?'out':''}"><div class="head"><span><b>${esc(s.players[i].name)}</b>${ptsHtml(i)}</span><span>${st}</span></div><div class="row">${cards}</div></section>`;
+    return `<section class="opp ${isTurn?'turn':''} ${playing&&hid===0?'out':''}"><div class="head"><span><b>${esc(s.players[i].name)}</b>${ptsHtml(i)}</span><span>${st}</span></div><div class="row">${cards}</div>${laHtml}</section>`;
   }).join('');
 
   const turnName = esc(s.players[s.turn]?.name||'');
-  const drawnHtml = (s.drawn!==null && playing) ? `<div class="drawn">${cardHtml({id:s.drawn,open:false,fresh:0},{face:myTurn})}<span>引いたカード</span></div>` : '';
+  const drawnHtml = (s.drawn!==null && playing) ? `<div class="drawn">${cardHtml({id:s.drawn,open:false,fresh:0},{face:myTurn})}<span>${s.drawnFrom===0?'左の山から':s.drawnFrom===1?'右の山から':''}引いたカード</span></div>` : '';
   const L = s.last;
-  const lastHtml = L ? `<div class="result ${L.ok?'ok':'ng'}">${esc(s.players[L.by].name)} → ${esc(s.players[L.target].name)}の${L.pos}枚目に「${L.num}」… ${L.ok?`正解${L.gain?`（+${L.gain}点）`:''}`:'ハズレ'}</div>` : '';
+  const lastHtml = L ? `<div class="result ${L.ok?'ok':'ng'}">${esc(s.players[L.by].name)} → ${esc(s.players[L.target].name)}の小さい方から${L.pos}枚目に「${L.num}」… ${L.ok?`正解${L.gain?`（+${L.gain}点）`:''}`:'ハズレ'}</div>` : '';
   let msg='';
   if(!playing) msg='';
   else if(!myTurn) msg = `${turnName} さんの番です`;
@@ -721,13 +777,14 @@ function renderGame(){
   if(seat>=0){
     const cards = hand(s,seat).map(c=>{
       const sel = (s.attackId===c.id) || (needAttackCard && ui.attackId===c.id);
-      return cardHtml(c,{face:true, pick:needAttackCard && !c.open, act:'attackcard', seat, sel, tag:c.open?'':'伏'});
+      return cardHtml(c,{face:true, pick:needAttackCard && !c.open, act:'attackcard', seat, sel, tag:c.open?'':(playing && s.lastPlaced && s.lastPlaced.seat===seat && s.lastPlaced.cardId===c.id ? '新' : '伏'), six:c.open&&numOf(c.id)===6});
     }).join('');
     const hid=hiddenCount(s,seat);
     mine = `<section class="mine lg"><div class="head"><span><b>あなた</b>${ptsHtml(seat)}</span><span>${playing&&hid===0?'全公開':`伏せ ${hid}枚`}</span></div><div class="row">${cards}</div></section>`;
   }
 
-  const log = `<details><summary>ログ（${s.log.length}）</summary><ol reversed>${s.log.slice().reverse().map(t=>`<li>${esc(t)}</li>`).join('')}</ol></details>`;
+  const showLog = (s.settings.log||'full')!=='pro' || !playing;
+  const log = !showLog ? '<p class="muted">上級卓：ログは非表示（ラウンド終了後に見られます）</p>' : `<details><summary>ログ（${s.log.length}）</summary><ol reversed>${s.log.slice().reverse().map(t=>`<li>${esc(t)}</li>`).join('')}</ol></details>`;
   const isHost = s.host===me.pid;
   const roundLabel = s.match ? `第${s.match.round}/${s.match.rounds}ラウンド` : '';
 
@@ -796,7 +853,7 @@ function renderStats(){
     const hist = st.list.map(g=>{
       const ps = g.players.slice().sort((a,b)=>a.rank-b.rank);
       const self = g.players.find(p=>p.pid===pid);
-      const tags = [g.settings.chips?'チップあり':'チップなし', g.settings.deck==='local'?'山2つ':'山1つ', `${g.players.length}人`].join('／');
+      const tags = [g.settings.chips?'チップあり':'チップなし', g.settings.deck==='local'?'山2つ':'山1つ', g.settings.log==='pro'?'上級卓':'初心者卓', `${g.players.length}人`].join('／');
       const rounds = g.rounds.map((r,k)=>`R${k+1}：${esc(g.players.find(p=>p.pid===r.winner)?.name||'')} 勝利`).join('<br>');
       return `<li><details><summary><span>${fmtDate(g.endedAt)}<br><span class="tags">${tags}</span></span><span class="${self.rank===1?'me':''}">${self.rank}位${g.settings.chips?`　${signed(self.points-g.settings.initPoints)}`:''}</span></summary>
         <div class="tbl" style="margin-top:8px"><table><tbody>${ps.map(p=>`<tr><td class="${p.pid===pid?'me':''}">${p.rank}位　${esc(p.name)}</td>${g.settings.chips?`<td>${p.points}点</td>`:''}<td>R勝 ${p.roundWins}</td></tr>`).join('')}</tbody></table></div>
