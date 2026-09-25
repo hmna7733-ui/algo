@@ -77,6 +77,11 @@ h3{margin:0;font-size:15px}
 .seg button{flex:1;padding:10px 6px;border-radius:8px;font-size:14px;font-weight:700;color:var(--muted)}
 .seg button.on{background:var(--ink);color:var(--black)}
 .seg button:disabled{cursor:default}
+.stepper{display:flex;align-items:center;gap:10px;background:var(--table);border-radius:10px;padding:3px}
+.stepper button{width:48px;height:42px;border-radius:8px;font-size:22px;font-weight:900;background:var(--panel)}
+.stepper button:disabled{opacity:.3;cursor:default}
+.stepper output{flex:1;text-align:center;font-size:22px;font-weight:900}
+.stepper output small{font-size:13px;color:var(--muted);font-weight:400;margin-left:4px}
 
 /* 対戦 */
 .top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);gap:12px}
@@ -148,6 +153,21 @@ td.plus{color:var(--hit)} td.minus{color:var(--miss)}
 .card .tag.new{color:var(--accent);opacity:1}
 .card.b .tag.new,.card.w .tag.new{background:var(--accent);color:var(--black);border-radius:3px;left:5px;right:5px;top:3px}
 .lastatk{margin-top:8px;font-size:12px;color:var(--muted)}
+/* 3・4人：卓を囲む配置（下＝自分、反時計回りに 右→上→左） */
+.board{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start}
+.b-top{grid-column:1/-1}
+.b-center{min-width:0;align-self:center}
+.opp.side{width:80px;padding:8px 6px;display:flex;flex-direction:column;align-items:center}
+.side .head{flex-direction:column;align-items:center;gap:2px;text-align:center}
+.side .head b{font-size:13px;word-break:break-all}
+.side .head .pts{margin-left:4px;font-size:12px}
+.col{display:flex;flex-direction:column;gap:5px;align-items:center;padding:8px 0 2px;min-height:60px}
+.card.hz{width:56px;height:38px;font-size:20px;border-radius:5px}
+.card.hz .tag{top:1px;font-size:8px}
+.side.left .card.sel{transform:translateX(6px)}
+.side.right .card.sel{transform:translateX(-6px)}
+.side .lastatk{font-size:10px;text-align:center;line-height:1.4;margin-top:6px}
+.side .dir{font-size:10px;color:var(--muted)}
 .lastatk .ok{color:var(--hit);font-weight:700}.lastatk .ng{color:var(--miss);font-weight:700}
 .six-fx{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;animation:fxbg 2.4s ease-out forwards}
 .six-fx .burst{position:absolute;width:220vmax;height:220vmax;left:50%;top:50%;margin:-110vmax 0 0 -110vmax;
@@ -216,10 +236,11 @@ function deckCount(s){ return pileArr(s).reduce((a,p)=>a+p.length,0); }
 function addLog(s,t){ s.log.push(t); if(s.log.length>80) s.log.splice(0,s.log.length-80); }
 function insertCard(h,c){ h.push(c); h.sort((a,b)=>a.id-b.id); }
 
+function clampRounds(v){ v=Math.round(Number(v)); return v>=1 && v<=10 ? v : 3; }
 function newRoom(uid,name,settings){
   settings = settings || {};
   return {status:'lobby',host:uid,players:[{uid,name}],
-    settings:{chips:!!settings.chips, deck:settings.deck==='local'?'local':'normal', log:settings.log==='pro'?'pro':'full'},
+    settings:{chips:!!settings.chips, deck:settings.deck==='local'?'local':'normal', log:settings.log==='pro'?'pro':'full', rounds:clampRounds(settings.rounds)},
     hands:{},piles:{},pileCount:1,turn:0,phase:null,drawn:null,attackId:null,streak:0,
     last:null,winner:null,outOrder:[],log:[],seq:0,match:null,matchNo:0,
     createdAt:Date.now(),updatedAt:Date.now()};
@@ -262,7 +283,10 @@ function reduce(s0, uid, a){
     if(m.points){
       s.players.forEach((_,i)=>{ ranks[i] = 1 + s.players.filter((_,j)=>m.points[j]>m.points[i]).length; });
     }else{
-      m.results[m.results.length-1].order.forEach((seat,k)=>{ ranks[seat]=k+1; });
+      const wins = i => m.results.filter(r=>r.winner===i).length;
+      const place = i => m.results.reduce((a,r)=>a + r.order.indexOf(i) + 1, 0);
+      const better = (j,i) => wins(j)>wins(i) || (wins(j)===wins(i) && place(j)<place(i));
+      s.players.forEach((_,i)=>{ ranks[i] = 1 + s.players.filter((_,j)=>better(j,i)).length; });
     }
     m.ranks = ranks;
     s.status = 'ended';
@@ -270,7 +294,7 @@ function reduce(s0, uid, a){
     addLog(s,`対戦終了。優勝：${top}`);
     s._record = {
       endedAt: Date.now(),
-      settings: {chips:!!m.points, deck:s.settings.deck, log:s.settings.log||'full', initPoints: m.points ? INIT_POINTS[n] : null},
+      settings: {chips:!!m.points, deck:s.settings.deck, log:s.settings.log||'full', rounds:m.rounds, initPoints: m.points ? INIT_POINTS[n] : null},
       pids: s.players.map(p=>p.uid),
       players: s.players.map((p,i)=>({pid:p.uid, name:p.name, rank:ranks[i],
         points: m.points ? m.points[i] : null,
@@ -323,6 +347,7 @@ function reduce(s0, uid, a){
       if(a.chips!==undefined) s.settings.chips = !!a.chips;
       if(a.deck!==undefined) s.settings.deck = a.deck==='local' ? 'local' : 'normal';
       if(a.log!==undefined) s.settings.log = a.log==='pro' ? 'pro' : 'full';
+      if(a.rounds!==undefined) s.settings.rounds = clampRounds(a.rounds);
       return s;
     }
     case 'start': {
@@ -331,7 +356,7 @@ function reduce(s0, uid, a){
       if(n<2) fail('2人以上で開始できます');
       s.matchNo = (s.matchNo||0)+1;
       s.log = [];
-      s.match = {round:0, rounds: s.settings.chips ? n : 1, dealer: Math.floor(Math.random()*n),
+      s.match = {round:0, rounds: clampRounds(s.settings.rounds), dealer: Math.floor(Math.random()*n),
         points: s.settings.chips ? Object.fromEntries(s.players.map((_,i)=>[i,INIT_POINTS[n]])) : null,
         roundStart:null, results:[], ranks:null};
       dealRound();
@@ -530,7 +555,7 @@ const esc = s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 let toastTimer;
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2600); }
 const roomUrl = c=>`${location.origin}${location.pathname}?room=${c}${LOCAL?'&local=1':''}`;
-const DEFAULT_SETTINGS = {chips:true,deck:'normal',log:'full'};
+const DEFAULT_SETTINGS = {chips:true,deck:'normal',log:'full',rounds:3};
 const lastSettings = ()=>{ try{ return {...DEFAULT_SETTINGS, ...(JSON.parse(localStorage.getItem('algo_settings'))||{})}; }catch(e){ return {...DEFAULT_SETTINGS}; } };
 const fmtDate = t=>{ const d=new Date(t); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`; };
 const signed = v=> v>0?`+${v}`:`${v}`;
@@ -632,7 +657,7 @@ function syncUi(){
 /* ---------------- 描画 ---------------- */
 function cardHtml(c, opt={}){
   const col = isWhite(c.id)?'w':'b', face = opt.face;
-  const cls = ['card',col, face?'':'back', c.open?'open':'', opt.pick?'pick':'', opt.sel?'sel':'', opt.six?'six':'',
+  const cls = ['card',col, face?'':'back', c.open?'open':'', opt.pick?'pick':'', opt.sel?'sel':'', opt.six?'six':'', opt.hz?'hz':'',
     (c.fresh && state && c.fresh===state.seq)?'fresh':''].join(' ');
   const label = face ? `${colorName(c.id)}${numOf(c.id)}${c.open?'（公開）':''}` : `${colorName(c.id)}の伏せカード`;
   const attrs = opt.pick ? `role="button" tabindex="0" data-act="${opt.act}" data-seat="${opt.seat}" data-id="${c.id}"` : '';
@@ -704,8 +729,11 @@ function renderLobby(){
       <button class="btn sub" data-act="share">招待リンクを送る</button>
     </div>
     <div class="box">
+      <div><span class="lbl">ラウンド数</span>
+        <div class="stepper"><button data-act="rounds" data-d="-1" aria-label="減らす" ${!isHost||st.rounds<=1?'disabled':''}>−</button><output>${st.rounds}<small>ラウンド</small></output><button data-act="rounds" data-d="1" aria-label="増やす" ${!isHost||st.rounds>=10?'disabled':''}>＋</button></div></div>
+      <p class="muted">親はラウンドごとに交代します（公式ルールは人数分${n>=2?`＝${n}ラウンド`:''}）。${st.chips?'最終持ち点で順位を決めます。':'ラウンド勝利数で順位を決め、同数なら各ラウンドの順位の合計で比べます。'}</p>
       <div><span class="lbl">ポイントチップ</span>${segHtml('chips',[[true,'あり'],[false,'なし']],st.chips,isHost)}</div>
-      <p class="muted">${st.chips ? `全員が1回ずつ親をやる${n}ラウンド制。持ち点 ${INIT_POINTS[n]||'—'}点。正解で相手から10点（6なら20点）、ラウンド勝者は裏の枚数×10点（6は1枚につき+10点）を全員から受け取ります。` : '1ラウンドで決着します。'}</p>
+      <p class="muted">${st.chips ? `持ち点 ${INIT_POINTS[n]||'—'}点。正解で相手から10点（6なら20点）、ラウンド勝者は裏の枚数×10点（6は1枚につき+10点）を全員から受け取ります。` : 'チップなしで遊びます。'}</p>
       <div><span class="lbl">山札</span>${segHtml('deck',[['normal','1つ（ノーマル）'],['local','2つ（ローカル）']],st.deck,isHost)}</div>
       <p class="muted">${st.deck==='local' ? '残りを左右2つの山に分けます。引くときにどちらの山か選べます。各山の一番上と、その下のカードの色が見えます。' : '山札は1つ。一番上のカードの色が見えます。'}</p>
       <div><span class="lbl">ログ</span>${segHtml('log',[['full','初心者卓'],['pro','上級卓']],st.log||'full',isHost)}</div>
@@ -736,18 +764,26 @@ function renderGame(){
   const myTurn = playing && seat===s.turn;
   const attacking = myTurn && s.phase==='attack';
   const needAttackCard = attacking && s.drawn===null && s.attackId===null;
-  const order = seat>=0 ? [...Array(n-1)].map((_,k)=>(seat+1+k)%n) : [...Array(n).keys()];
-  const ptsHtml = i => pts ? `<span class="pts">${pts[i]}点</span>` : '';
+    const ptsHtml = i => pts ? `<span class="pts">${pts[i]}点</span>` : '';
 
   const isNew = (i,c) => playing && s.lastPlaced && s.lastPlaced.seat===i && s.lastPlaced.cardId===c.id && !c.open;
-  const opps = order.map(i=>{
+  // 各プレイヤーの手札は「その人から見て左が小さい」。自分から見た向きに変換して表示する
+  //   上（向かい）：右が小さい／左の席：上が小さい／右の席：下が小さい
+  const base = seat>=0 ? seat : 0, rel = k=>(base+k)%n;
+  const layout = n===2 ? [[rel(1),'top']] : n===3 ? [[rel(1),'right'],[rel(2),'left']] : [[rel(1),'right'],[rel(2),'top'],[rel(3),'left']];
+  if(seat<0) layout.push([base,'bottom']);
+  const panel = (i,pos) => {
     const h=hand(s,i), hid=hiddenCount(s,i), isTurn=playing && s.turn===i;
-    const cards = h.slice().reverse().map(c=>cardHtml(c,{face:c.open||showAll, pick:attacking && !c.open, act:'target', seat:i, sel:ui.target===i && ui.cardId===c.id, tag:isNew(i,c)?'新':'', six:c.open&&numOf(c.id)===6})).join('');
+    const side = pos==='left' || pos==='right';
+    const ordered = (pos==='top' || pos==='right') ? h.slice().reverse() : h.slice();
+    const cards = ordered.map(c=>cardHtml(c,{hz:side, face:c.open||showAll, pick:attacking && !c.open, act:'target', seat:i, sel:ui.target===i && ui.cardId===c.id, tag:isNew(i,c)?'新':'', six:c.open&&numOf(c.id)===6})).join('');
     const la = playing && s.lastAtk && s.lastAtk[i];
     const laHtml = la ? `<div class="lastatk">前回：${la.target===seat?'あなた':esc(s.players[la.target].name)}の小さい方から${la.pos}枚目に「${la.num}」→ <span class="${la.ok?'ok':'ng'}">${la.ok?'正解':'ハズレ'}</span></div>` : '';
     const st = !playing ? (s.winner===i?'<span class="now">ラウンド勝利</span>':'') : hid===0 ? '全公開' : isTurn ? '<span class="now">手番</span>' : `伏せ ${hid}枚`;
-    return `<section class="opp ${isTurn?'turn':''} ${playing&&hid===0?'out':''}"><div class="head"><span><b>${esc(s.players[i].name)}</b>${ptsHtml(i)}</span><span>${st}</span></div><div class="row">${cards}</div>${laHtml}</section>`;
-  }).join('');
+    const dir = side ? `<span class="dir">${pos==='left'?'↓ 小→大':'↑ 小→大'}</span>` : '';
+    return `<section class="opp ${side?'side '+pos:''} ${isTurn?'turn':''} ${playing&&hid===0?'out':''}"><div class="head"><span><b>${esc(s.players[i].name)}</b>${ptsHtml(i)}</span><span>${st}</span></div><div class="${side?'col':'row'}">${cards}</div>${dir}${laHtml}</section>`;
+  };
+  const PN = Object.fromEntries(layout.map(([i,pos])=>[pos,panel(i,pos)]));
 
   const turnName = esc(s.players[s.turn]?.name||'');
   const drawnHtml = (s.drawn!==null && playing) ? `<div class="drawn">${cardHtml({id:s.drawn,open:false,fresh:0},{face:myTurn})}<span>${s.drawnFrom===0?'左の山から':s.drawnFrom===1?'右の山から':''}引いたカード</span></div>` : '';
@@ -791,8 +827,9 @@ function renderGame(){
   $app.innerHTML = `
     <div class="top"><span>部屋 ${esc(code)}　${roundLabel}${seat<0?'（観戦中）':''}</span>
       <span class="r">${isHost && s.status!=='ended' ? '<button data-act="abort">中止</button>':''}<button data-act="share">招待</button></span></div>
-    ${opps}
-    <div class="mid">${pilesHtml(s, myTurn && s.phase==='draw')}${drawnHtml}<div class="msg">${lastHtml}<div>${msg}</div></div></div>
+    ${(()=>{ const mid = `<div class="mid">${pilesHtml(s, myTurn && s.phase==='draw')}${drawnHtml}<div class="msg">${lastHtml}<div>${msg}</div></div></div>`;
+      return (PN.left||PN.right) ? `<div class="board">${PN.top?`<div class="b-top">${PN.top}</div>`:''}<div class="b-left">${PN.left||''}</div><div class="b-center">${mid}</div><div class="b-right">${PN.right||''}</div></div>` : `${PN.top||''}${mid}`; })()}
+    ${PN.bottom||''}
     <div class="actions">${controls}</div>
     ${mine}
     ${log}
@@ -804,6 +841,15 @@ function sheetHtml(s){
   const m=s.match, pts=m && m.points, isHost=s.host===me.pid, n=s.players.length;
   const w = s.players[s.winner];
   const r = m.results[m.results.length-1];
+  if(s.status==='roundEnd' && !pts){
+    const rows = s.players.map((p,i)=>`<tr><td>${esc(p.name)}</td><td>${m.results.filter(x=>x.winner===i).length}</td></tr>`).join('');
+    return `<div class="overlay"><div class="sheet">
+      <h2>${w.uid===me.pid?'あなた':esc(w.name)} のラウンド勝利</h2>
+      <div class="tbl"><table><thead><tr><th>プレイヤー</th><th>ラウンド勝利</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${isHost ? `<button class="btn" data-act="next">次のラウンドへ（${m.round+1}/${m.rounds}）</button>` : `<p class="muted center">ホストが次のラウンドを始めるのを待っています…</p>`}
+      <button class="btn sub" data-act="sheet">盤面を見る</button>
+    </div></div>`;
+  }
   if(s.status==='roundEnd'){
     const rows = s.players.map((p,i)=>{ const d=m.points[i]-m.roundStart[i]; return `<tr><td>${esc(p.name)}</td><td>${m.points[i]}</td><td class="${d>0?'plus':d<0?'minus':''}">${signed(d)}</td></tr>`; }).join('');
     return `<div class="overlay"><div class="sheet">
@@ -853,7 +899,7 @@ function renderStats(){
     const hist = st.list.map(g=>{
       const ps = g.players.slice().sort((a,b)=>a.rank-b.rank);
       const self = g.players.find(p=>p.pid===pid);
-      const tags = [g.settings.chips?'チップあり':'チップなし', g.settings.deck==='local'?'山2つ':'山1つ', g.settings.log==='pro'?'上級卓':'初心者卓', `${g.players.length}人`].join('／');
+      const tags = [g.settings.chips?'チップあり':'チップなし', g.settings.deck==='local'?'山2つ':'山1つ', g.settings.log==='pro'?'上級卓':'初心者卓', `${g.rounds.length}R`, `${g.players.length}人`].join('／');
       const rounds = g.rounds.map((r,k)=>`R${k+1}：${esc(g.players.find(p=>p.pid===r.winner)?.name||'')} 勝利`).join('<br>');
       return `<li><details><summary><span>${fmtDate(g.endedAt)}<br><span class="tags">${tags}</span></span><span class="${self.rank===1?'me':''}">${self.rank}位${g.settings.chips?`　${signed(self.points-g.settings.initPoints)}`:''}</span></summary>
         <div class="tbl" style="margin-top:8px"><table><tbody>${ps.map(p=>`<tr><td class="${p.pid===pid?'me':''}">${p.rank}位　${esc(p.name)}</td>${g.settings.chips?`<td>${p.points}点</td>`:''}<td>R勝 ${p.roundWins}</td></tr>`).join('')}</tbody></table></div>
@@ -895,6 +941,11 @@ function handle(el){
     case 'joinhere': return joinRoom(code);
     case 'leave': return leaveRoom();
     case 'share': return share();
+    case 'rounds': {
+      const v = clampRounds((state.settings.rounds||3) + Number(el.dataset.d));
+      localStorage.setItem('algo_settings',JSON.stringify({...lastSettings(), rounds:v}));
+      return act({type:'settings',rounds:v});
+    }
     case 'set': {
       const k=el.dataset.k, v = k==='chips' ? el.dataset.v==='true' : el.dataset.v;
       const saved = {...lastSettings(), [k]:v}; localStorage.setItem('algo_settings',JSON.stringify(saved));
