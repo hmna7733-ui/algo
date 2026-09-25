@@ -798,7 +798,7 @@ function renderHome(){
   const last = localStorage.getItem('algo_last');
   $app.innerHTML = `
     ${logoHtml()}
-    <p class="lead">身内で、数字を推理しあう。${LOCAL?'<br>（ローカルテストモード）':''}</p>
+    ${LOCAL?`<p class="lead">（ローカルテストモード）</p>`:''}
     <div class="box">
       <div class="who"><b>${esc(me.name)}</b><button data-act="who">プレイヤーを変更</button></div>
       <button class="btn" data-act="create">部屋を作る</button>
